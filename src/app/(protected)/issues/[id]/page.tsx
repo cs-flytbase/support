@@ -67,7 +67,12 @@ type CallMention = {
   call_date?: string;
 };
 
-export default function IssueDetailPage({ params }: { params: { id: string } }) {
+// Define proper props type for Next.js App Router
+type PageProps = {
+  params: Promise<{ id: string }>
+};
+
+export default function IssueDetailPage({ params }: PageProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerIssues, setCustomerIssues] = useState<CustomerIssue[]>([]);
@@ -81,10 +86,14 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
   
   // Extract the ID from params when the component mounts
   useEffect(() => {
-    // This is a safe way to access params in a client component
-    if (params && typeof params === 'object' && 'id' in params) {
-      setIssueId(params.id);
-    }
+    // Handle params as a Promise
+    Promise.resolve(params).then((resolvedParams) => {
+      if (resolvedParams && typeof resolvedParams === 'object' && 'id' in resolvedParams) {
+        setIssueId(resolvedParams.id);
+      }
+    }).catch(error => {
+      console.error('Error resolving params:', error);
+    });
   }, [params]);
 
   // Load issue details and related data

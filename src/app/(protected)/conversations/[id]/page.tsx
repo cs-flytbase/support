@@ -100,8 +100,13 @@ interface Customer {
   updated_at: string;
 }
 
+// Define proper props type for Next.js App Router
+type PageProps = {
+  params: Promise<{ id: string }>
+};
+
 // Update the component to accept params as props
-export default function ConversationDetailPage({ params }: { params: { id: string } }) {
+export default function ConversationDetailPage({ params }: PageProps) {
   const { user: clerkUser, isLoaded } = useUser();
   const supabase = createClient();
   
@@ -110,10 +115,14 @@ export default function ConversationDetailPage({ params }: { params: { id: strin
   
   // Extract the ID from params when the component mounts
   useEffect(() => {
-    // This is a safe way to access params in a client component
-    if (params && typeof params === 'object' && 'id' in params) {
-      setConversationId(params.id);
-    }
+    // Handle params as a Promise
+    Promise.resolve(params).then((resolvedParams) => {
+      if (resolvedParams && typeof resolvedParams === 'object' && 'id' in resolvedParams) {
+        setConversationId(resolvedParams.id);
+      }
+    }).catch(error => {
+      console.error('Error resolving params:', error);
+    });
   }, [params]);
   
   // State variables
