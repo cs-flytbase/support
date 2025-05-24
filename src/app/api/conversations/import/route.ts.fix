@@ -1,0 +1,192 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuth } from '@clerk/nextjs/server';
+import { createClient } from '@/utils/supabase/server';
+
+interface ChatToImport {
+  chat_id: string;
+  chat_name: string;
+  chat_type: string;
+  last_message_timestamp?: string;
+  members?: Record<string, any>;
+}
+
+interface ChatMember {
+  contact_id?: string;
+  contact_name?: string;
+  is_admin?: boolean;
+  contact_image?: string | null;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Authenticate the user
+    const { userId } = getAuth(req);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Initialize Supabase client
+    const supabase = createClient();
+    
+    // Parse the request body
+    const body = await req.json();
+    const { apiKeyId, selectedChats } = body;
+    
+    // Validate request data
+    if (!apiKeyId || !selectedChats || !Array.isArray(selectedChats) || selectedChats.length === 0) {
+      return NextResponse.json({ error: 'Invalid request data' }, { status: 400 });
+    }
+    
+    console.log(`Starting import of ${selectedChats.length} conversations`);
+
+    // Get the user's Supabase ID
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('clerk_id', userId)
+      .single();
+
+    if (userError || !userData) {
+      console.error('User not found:', userError);
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Get the API key details
+    const { data: apiKeyData, error: apiKeyError } = await supabase
+      .from('api_keys')
+      .select('*')
+      .eq('id', apiKeyId)
+      .eq('user_id', userData.id)
+      .single();
+
+    if (apiKeyError || !apiKeyData) {
+      console.error('API key not found:', apiKeyError);
+      return NextResponse.json({ error: 'API key not found' }, { status: 404 });
+    }
+
+    // Process each selected chat
+    const importResults = [];
+    
+    // Simple direct insert approach for immediate reliability
+    for (const chat of selectedChats) {
+      try {
+        console.log(`Processing chat: ${chat.chat_name}`);
+        
+        // Check if conversation already exists
+        const { data: existingChat } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('user_id', userData.id)
+          .eq('chat_id', chat.chat_id)
+          .maybeSingle();
+          
+        let chatId: string;
+        
+        if (existingChat) {
+          // Update the existing conversation
+          chatId = existingChat.id;
+          console.log(`Updating existing conversation: ${chatId}`);
+          
+          await supabase
+            .from('conversations')
+            .update({
+              title: chat.chat_name,
+              last_updated_at: new Date().toISOString(),
+              metadata: { 
+                ...chat, 
+                last_import: new Date().toISOString() 
+              }
+            })
+            .eq('id', chatId);
+        } else {
+          // Create a new conversation record
+          console.log(`Creating new conversation: ${chat.chat_name}`);
+          
+          const { data: newChat, error: insertError } = await supabase
+            .from('conversations')
+            .insert({
+              user_id: userData.id,
+              chat_id: chat.chat_id,
+              title: chat.chat_name || 'Imported Chat',
+              platform_type: 'whatsapp',
+              is_group: chat.chat_type === 'group',
+              status: 'active',
+              metadata: chat
+            })
+            .select('id')
+            .single();
+            
+          if (insertError || !newChat) {
+            throw new Error(`Failed to create conversation: ${insertError?.message || 'Unknown error'}`);
+          }
+          
+          chatId = newChat.id;
+          console.log(`Created new conversation with ID: ${chatId}`);
+        }
+        
+        // Add members if available
+        if (chat.members && typeof chat.members === 'object') {
+          try {
+            // Clear existing members first
+            await supabase
+              .from('conversation_members')
+              .delete()
+              .eq('conversation_id', chatId);
+              
+            // Process each member
+            const memberEntries = Object.entries(chat.members);
+            console.log(`Adding ${memberEntries.length} members to conversation ${chatId}`);
+            
+            for (const [phone, memberData] of memberEntries) {
+              // TypeScript check and safe access
+              const member = memberData as ChatMember;
+              
+              await supabase
+                .from('conversation_members')
+                .insert({
+                  conversation_id: chatId,
+                  external_id: member.contact_id || phone,
+                  phone_number: phone,
+                  name: member.contact_name || 'Unknown',
+                  is_admin: member.is_admin || false,
+                  avatar_url: member.contact_image || null,
+                  metadata: member
+                });
+            }
+            console.log(`Successfully added members to conversation ${chatId}`);
+          } catch (memberError) {
+            console.error(`Error adding members to conversation ${chatId}:`, memberError);
+            // Continue with the import even if member addition fails
+          }
+        }
+        
+        importResults.push({ 
+          chat_id: chat.chat_id, 
+          success: true,
+          id: chatId
+        });
+        
+      } catch (error) {
+        console.error(`Error importing chat ${chat.chat_name}:`, error);
+        importResults.push({ 
+          chat_id: chat.chat_id, 
+          success: false, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
+      }
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      imported: importResults,
+      message: `Successfully imported ${importResults.filter(r => r.success).length} of ${selectedChats.length} conversations`
+    });
+    
+  } catch (error) {
+    console.error('Error importing conversations:', error);
+    return NextResponse.json({ 
+      error: 'Failed to import conversations', 
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}

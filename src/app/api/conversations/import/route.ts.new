@@ -1,0 +1,222 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuth } from '@clerk/nextjs/server';
+import { createClient } from '@/utils/supabase/server';
+
+// Define types for the chat import process
+interface ChatToImport {
+  chat_id: string;
+  chat_name: string;
+  chat_type: string;
+  last_message_timestamp?: string;
+  members?: Record<string, any>;
+}
+
+interface ChatMember {
+  contact_id?: string;
+  name?: string;
+  contact_name?: string;
+  contact_image?: string | null;
+  is_admin?: boolean;
+}
+
+export async function POST(req: NextRequest) {
+  console.log('API: POST /api/conversations/import called');
+  
+  try {
+    // Get authenticated user from Clerk
+    const { userId } = getAuth(req);
+    console.log('API: Clerk userId:', userId);
+    
+    if (!userId) {
+      console.error('API: No userId found in Clerk auth');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const supabase = createClient();
+    
+    // Parse request body
+    let body;
+    try {
+      body = await req.json();
+      console.log('API: Request body received');
+    } catch (parseError) {
+      console.error('API: Failed to parse request body:', parseError);
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+    
+    const { apiKeyId, selectedChats } = body;
+
+    // Validate required fields
+    if (!apiKeyId) {
+      console.error('API: Missing apiKeyId in request');
+      return NextResponse.json({ error: 'API key ID is required' }, { status: 400 });
+    }
+    
+    if (!selectedChats || !Array.isArray(selectedChats) || selectedChats.length === 0) {
+      console.error('API: Invalid or empty selectedChats');
+      return NextResponse.json({ error: 'Selected chats must be a non-empty array' }, { status: 400 });
+    }
+    
+    console.log('API: Received request to import', selectedChats.length, 'conversations');
+
+    // Get the user's Supabase ID
+    console.log('API: Looking up Supabase user ID for Clerk ID:', userId);
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('clerk_id', userId)
+      .single();
+
+    if (userError) {
+      console.error('API: Error looking up user:', userError);
+      return NextResponse.json({ error: 'Failed to find user record' }, { status: 500 });
+    }
+    
+    if (!userData) {
+      console.error('API: No Supabase user found for Clerk ID:', userId);
+      return NextResponse.json({ error: 'User not found in database' }, { status: 404 });
+    }
+    
+    console.log('API: Found Supabase user ID:', userData.id);
+
+    // Get the API key details
+    console.log('API: Looking up API key with ID:', apiKeyId);
+    const { data: apiKeyData, error: apiKeyError } = await supabase
+      .from('api_keys')
+      .select('*')
+      .eq('id', apiKeyId)
+      .eq('user_id', userData.id)
+      .single();
+
+    if (apiKeyError) {
+      console.error('API: Error looking up API key:', apiKeyError);
+      return NextResponse.json({ error: 'Failed to find API key' }, { status: 500 });
+    }
+    
+    if (!apiKeyData) {
+      console.error('API: No API key found with ID:', apiKeyId);
+      return NextResponse.json({ error: 'API key not found or not accessible' }, { status: 404 });
+    }
+    
+    console.log('API: Found API key for platform:', apiKeyData.platform);
+
+    // Process each selected chat
+    const results = [];
+    const successfulChats = [];
+    
+    for (const chat of selectedChats) {
+      console.log(`Processing chat: ${chat.chat_name} (${chat.chat_id})`);
+      
+      try {
+        // Create the conversation in Supabase
+        const { data: newConversation, error: insertError } = await supabase
+          .from('conversations')
+          .insert({
+            user_id: userData.id,
+            chat_id: chat.chat_id,
+            title: chat.chat_name || 'WhatsApp Chat',
+            platform_type: 'whatsapp',
+            is_group: chat.chat_type === 'group',
+            status: 'active',
+            metadata: {
+              chat_type: chat.chat_type,
+              members: chat.members || {}
+            }
+          })
+          .select('id')
+          .single();
+
+        if (insertError) {
+          console.error('Error creating conversation:', insertError);
+          results.push({
+            chat_id: chat.chat_id,
+            success: false,
+            error: insertError.message
+          });
+          
+          // Try a simplified version as a fallback
+          try {
+            console.log('Attempting fallback insert for:', chat.chat_name);
+            const { data: fallbackConv, error: fallbackError } = await supabase
+              .from('conversations')
+              .insert({
+                user_id: userData.id,
+                chat_id: chat.chat_id,
+                title: chat.chat_name || 'Chat',
+                platform_type: 'whatsapp',
+                status: 'active'
+              })
+              .select('id')
+              .single();
+              
+            if (fallbackConv) {
+              console.log('Fallback insert succeeded:', fallbackConv.id);
+              successfulChats.push(fallbackConv.id);
+              results.push({
+                chat_id: chat.chat_id,
+                success: true,
+                id: fallbackConv.id,
+                note: 'Created with fallback'
+              });
+            } else {
+              console.error('Fallback insert also failed:', fallbackError);
+            }
+          } catch (fallbackErr) {
+            console.error('Fatal error in fallback:', fallbackErr);
+          }
+        } else if (newConversation) {
+          console.log('Created conversation with ID:', newConversation.id);
+          successfulChats.push(newConversation.id);
+          results.push({
+            chat_id: chat.chat_id,
+            success: true,
+            id: newConversation.id
+          });
+          
+          // If we have member information, store that too
+          if (chat.members && Object.keys(chat.members).length > 0) {
+            try {
+              const memberInserts = Object.entries(chat.members).map(([phone, memberData]) => ({
+                conversation_id: newConversation.id,
+                phone_number: phone,
+                name: memberData.contact_name || memberData.name || 'Unknown',
+                is_admin: memberData.is_admin || false,
+                avatar_url: memberData.contact_image || null
+              }));
+              
+              // Insert all members in a batch
+              if (memberInserts.length > 0) {
+                await supabase.from('conversation_members').insert(memberInserts);
+                console.log(`Added ${memberInserts.length} members to conversation`);
+              }
+            } catch (memberError) {
+              console.error('Error adding conversation members:', memberError);
+              // Not failing the whole operation for member errors
+            }
+          }
+        }
+      } catch (chatError) {
+        console.error(`Error processing chat ${chat.chat_id}:`, chatError);
+        results.push({
+          chat_id: chat.chat_id,
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+
+    // Return the results
+    return NextResponse.json({ 
+      success: successfulChats.length > 0,
+      message: `Successfully imported ${successfulChats.length} of ${selectedChats.length} conversations`,
+      results
+    });
+    
+  } catch (error) {
+    console.error('API: Unhandled error in import process:', error);
+    return NextResponse.json({ 
+      error: 'Failed to import conversations', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 });
+  }
+}
