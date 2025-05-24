@@ -18,6 +18,11 @@ type Issue = {
   category: string | null;
   first_identified: string | null;
   resolved_at: string | null;
+  // UI helper fields
+  customer_name?: string;
+  customer_count?: number;
+  calls_count?: number;
+  customer_names?: string[];
 };
 
 type Customer = {
@@ -221,20 +226,133 @@ export default function IssuesPage() {
   const router = useRouter();
   const supabase = createClient();
   
-  // Load issues
+  // Load issues with customer details
   const loadIssues = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const { data, error } = await supabase
+      // First fetch all issues
+      const { data: issuesData, error: issuesError } = await supabase
         .from('issues')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (issuesError) throw issuesError;
       
-      setIssues(data || []);
+      if (issuesData && issuesData.length > 0) {
+        // Get all unique customer IDs from issues
+        const customerIds = [...new Set(
+          issuesData.map(issue => issue.created_by_customer_id).filter(Boolean)
+        )];
+        
+        // Also fetch issue call mentions to get customer IDs from calls
+        const { data: callMentionsData, error: callMentionsError } = await supabase
+          .from('issue_call_mentions')
+          .select('issue_id, customer_id, call_id')
+          .in('issue_id', issuesData.map(issue => issue.id));
+        
+        if (callMentionsError) throw callMentionsError;
+        
+        // If we have call mentions, add their customer IDs to our list
+        if (callMentionsData && callMentionsData.length > 0) {
+          const callMentionCustomerIds = callMentionsData
+            .map(mention => mention.customer_id)
+            .filter(Boolean);
+            
+          // Also get customer IDs from calls
+          const callIds = [...new Set(callMentionsData.map(mention => mention.call_id).filter(Boolean))];
+          
+          if (callIds.length > 0) {
+            const { data: callsData, error: callsError } = await supabase
+              .from('calls')
+              .select('id, customer_id')
+              .in('id', callIds);
+              
+            if (callsError) throw callsError;
+            
+            if (callsData && callsData.length > 0) {
+              const callCustomerIds = callsData.map(call => call.customer_id).filter(Boolean);
+              // Add call customer IDs to our list
+              customerIds.push(...callCustomerIds);
+            }
+          }
+          
+          // Add call mention customer IDs to our list
+          customerIds.push(...callMentionCustomerIds);
+        }
+        
+        // Remove duplicates
+        const uniqueCustomerIds = [...new Set(customerIds)];
+        
+        // If we have customer IDs, fetch customer details
+        if (uniqueCustomerIds.length > 0) {
+          const { data: customerData, error: customerError } = await supabase
+            .from('customers')
+            .select('id, name')
+            .in('id', uniqueCustomerIds);
+            
+          if (customerError) throw customerError;
+          
+          // Create a map of customer IDs to names for quick lookup
+          const customerMap = new Map();
+          (customerData || []).forEach(customer => {
+            customerMap.set(customer.id, customer.name);
+          });
+          
+          // Create maps to track multiple customers and calls per issue
+          const issueCustomersMap = new Map();
+          const issueCallsMap = new Map();
+          
+          // Initialize maps with issues
+          issuesData.forEach(issue => {
+            issueCustomersMap.set(issue.id, new Set());
+            issueCallsMap.set(issue.id, new Set());
+            
+            // Add the original customer if it exists
+            if (issue.created_by_customer_id) {
+              issueCustomersMap.get(issue.id).add(issue.created_by_customer_id);
+            }
+          });
+          
+          // Add customers and calls from call mentions
+          (callMentionsData || []).forEach(mention => {
+            if (mention.customer_id && issueCustomersMap.has(mention.issue_id)) {
+              issueCustomersMap.get(mention.issue_id).add(mention.customer_id);
+            }
+            
+            if (mention.call_id && issueCallsMap.has(mention.issue_id)) {
+              issueCallsMap.get(mention.issue_id).add(mention.call_id);
+            }
+          });
+          
+          // Add customer names to issues with counts
+          const issuesWithCustomers = issuesData.map(issue => {
+            const customerIds = Array.from(issueCustomersMap.get(issue.id) || []);
+            const customerNames = customerIds.map(id => customerMap.get(id) || 'Unknown').filter(Boolean);
+            
+            // Get the first customer name for backward compatibility
+            const primaryCustomerName = customerNames.length > 0 ? customerNames[0] : 'Unknown';
+            
+            // Count calls for this issue
+            const callsCount = issueCallsMap.get(issue.id)?.size || 0;
+            
+            return {
+              ...issue,
+              customer_name: primaryCustomerName,
+              customer_names: customerNames,
+              customer_count: customerIds.length,
+              calls_count: callsCount
+            };
+          });
+          
+          setIssues(issuesWithCustomers);
+        } else {
+          setIssues(issuesData);
+        }
+      } else {
+        setIssues([]);
+      }
     } catch (err: any) {
       console.error('Error loading issues:', err);
       setError(err.message || 'Failed to load issues');
@@ -561,9 +679,22 @@ export default function IssuesPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {issue.created_by_customer_id ? getCustomerName(issue.created_by_customer_id) : 'N/A'}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <div className="text-sm text-gray-900 flex items-center">
+                          <span className="font-medium mr-2">{issue.customer_count || 0}</span>
+                          <span className="text-xs text-gray-500">companies</span>
+                        </div>
+                        {issue.customer_names && issue.customer_names.length > 0 && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {issue.customer_names.slice(0, 2).join(', ')}
+                            {issue.customer_names.length > 2 && ` +${issue.customer_names.length - 2} more`}
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-500 mt-1 flex items-center">
+                          <span className="mr-1">{issue.calls_count || 0}</span>
+                          <span>calls</span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

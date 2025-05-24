@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useUser } from '@clerk/nextjs';
@@ -100,9 +100,11 @@ interface Customer {
   updated_at: string;
 }
 
-export default function ConversationDetailPage() {
-  const params = useParams();
-  const conversationId = params.id as string;
+// Update the component to accept params as props
+export default function ConversationDetailPage({ params }: { params: { id: string } }) {
+  // Use React.use() to properly unwrap the params
+  const unwrappedParams = use(Promise.resolve(params));
+  const conversationId = unwrappedParams.id;
   const { user: clerkUser, isLoaded } = useUser();
   const supabase = createClient();
   

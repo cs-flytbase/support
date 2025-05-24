@@ -55,14 +55,6 @@ interface Call {
   created_at: string;
 }
 
-interface Agent {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  title: string;
-}
-
 interface Participant {
   id: string;
   call_id: string;
@@ -75,20 +67,36 @@ interface Participant {
 }
 
 export default function CustomerDetailPage() {
-  const params = useParams();
+  const supabase = createClient();
   const router = useRouter();
+  const params = useParams();
   const customerId = params.id as string;
+  
+  // State variables
+  const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState<CustomerDetails | null>(null);
+  const [contacts, setContacts] = useState<CustomerContact[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [calls, setCalls] = useState<Call[]>([]);
   const [participants, setParticipants] = useState<Record<string, Participant[]>>({});
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [contactsError, setContactsError] = useState<string | null>(null);
+  
+  // Company edit state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [companyFormData, setCompanyFormData] = useState<Partial<CustomerDetails>>({
+    name: '',
+    email: '',
+    phone: '',
+    website: '',
+    address: '',
+    customer_type: '',
+    industry: ''
+  });
+  const [saveLoading, setSaveLoading] = useState(false);
   
   // Customer contacts state
-  const [contacts, setContacts] = useState<CustomerContact[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
-  const [contactsError, setContactsError] = useState<string | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [editingContact, setEditingContact] = useState<CustomerContact | null>(null);
   const [contactFormData, setContactFormData] = useState<Partial<CustomerContact>>({
@@ -96,86 +104,183 @@ export default function CustomerDetailPage() {
     email: '',
     phone: '',
     title: '',
-    is_primary: false
+    is_primary: false,
+    customer_id: ''
   });
   
-  const supabase = createClient();
+  // State for available companies
+  const [availableCompanies, setAvailableCompanies] = useState<CustomerDetails[]>([]);
+  
+  // Customer edit modal state
+  const [showCustomerEditModal, setShowCustomerEditModal] = useState(false);
+  const [customerEditData, setCustomerEditData] = useState<Partial<CustomerDetails>>({
+    name: '',
+    email: '',
+    phone: '',
+    website: '',
+    address: '',
+    customer_type: '',
+    industry: ''
+  });
+  const [customerEditLoading, setCustomerEditLoading] = useState(false);
+  const [selectedContactForEdit, setSelectedContactForEdit] = useState<CustomerContact | null>(null);
 
-  // Load customer details
-  useEffect(() => {
-    async function loadCustomerData() {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        // Fetch customer details
-        const { data: customerData, error: customerError } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('id', customerId)
-          .single();
-        
-        if (customerError) throw customerError;
-        if (!customerData) throw new Error('Customer not found');
-        
-        setCustomer(customerData);
-        
-        // Fetch customer conversations
-        const { data: conversationData, error: conversationError } = await supabase
-          .from('conversations')
-          .select('*')
-          .eq('customer_id', customerId)
-          .order('created_at', { ascending: false });
-        
-        if (conversationError) throw conversationError;
-        setConversations(conversationData || []);
-        
-        // Fetch customer calls
-        const { data: callData, error: callError } = await supabase
-          .from('calls')
-          .select('*')
-          .eq('customer_id', customerId)
-          .order('created_at', { ascending: false });
-        
-        if (callError) throw callError;
-        setCalls(callData || []);
-        
-        // Fetch call participants for each call
-        if (callData && callData.length > 0) {
-          const callIds = callData.map(call => call.id);
-          const { data: participantData, error: participantError } = await supabase
-            .from('call_participants')
-            .select('*')
-            .in('call_id', callIds);
-          
-          if (participantError) throw participantError;
-          
-          // Group participants by call_id
-          const participantsByCall: Record<string, Participant[]> = {};
-          participantData?.forEach(participant => {
-            if (!participantsByCall[participant.call_id]) {
-              participantsByCall[participant.call_id] = [];
-            }
-            participantsByCall[participant.call_id].push(participant);
-          });
-          
-          setParticipants(participantsByCall);
-        }
-
-        // Fetch customer contacts
-        await loadCustomerContacts();
-      } catch (err: any) {
-        console.error('Error loading customer data:', err);
-        setError(err.message || 'Failed to load customer data');
-      } finally {
-        setLoading(false);
-      }
+  // Reset company form with current customer data
+  const resetCompanyForm = (customerData: CustomerDetails) => {
+    setCompanyFormData({
+      name: customerData.name || '',
+      email: customerData.email || '',
+      phone: customerData.phone || '',
+      website: customerData.website || '',
+      address: customerData.address || '',
+      customer_type: customerData.customer_type || '',
+      industry: customerData.industry || ''
+    });
+  };
+  
+  // Handle company form input change
+  const handleCompanyFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setCompanyFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  // Save company changes
+  const saveCompanyChanges = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!companyFormData.name) {
+      alert('Company name is required');
+      return;
     }
     
-    if (customerId) {
-      loadCustomerData();
+    setSaveLoading(true);
+    setError(null);
+    
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          name: companyFormData.name,
+          email: companyFormData.email || null,
+          phone: companyFormData.phone || null,
+          website: companyFormData.website || null,
+          address: companyFormData.address || null,
+          customer_type: companyFormData.customer_type || null,
+          industry: companyFormData.industry || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', customerId);
+      
+      if (error) throw error;
+      
+      // Update the local state
+      if (customer) {
+        const updatedCustomer = {
+          ...customer,
+          ...companyFormData,
+          updated_at: new Date().toISOString()
+        };
+        setCustomer(updatedCustomer as CustomerDetails);
+      }
+      
+      setShowEditModal(false);
+    } catch (err: any) {
+      console.error('Error updating company:', err);
+      setError(err.message || 'Failed to update company details');
+    } finally {
+      setSaveLoading(false);
     }
-  }, [customerId, supabase]);
+  };
+  
+  // Load all available companies for the contact form
+  const loadAvailableCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, name, email, website, phone, address, customer_type, industry, created_at, updated_at')
+        .order('name', { ascending: true });
+      
+      if (error) throw error;
+      setAvailableCompanies(data || []);
+    } catch (err: any) {
+      console.error('Error loading companies:', err);
+      // We don't set the error state here to avoid disrupting the main UI
+    }
+  };
+
+  // Load customer details
+  const loadCustomerData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    // Load available companies for contact form
+    await loadAvailableCompanies();
+    
+    try {
+      // Fetch customer details
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', customerId)
+        .single();
+      
+      if (customerError) throw customerError;
+      if (!customerData) throw new Error('Customer not found');
+      
+      setCustomer(customerData);
+      resetCompanyForm(customerData);
+      
+      // Fetch customer conversations
+      const { data: conversationData, error: conversationError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false });
+      
+      if (conversationError) throw conversationError;
+      setConversations(conversationData || []);
+      
+      // Fetch customer calls
+      const { data: callData, error: callError } = await supabase
+        .from('calls')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false });
+      
+      if (callError) throw callError;
+      setCalls(callData || []);
+      
+      // Fetch call participants for each call
+      if (callData && callData.length > 0) {
+        const callIds = callData.map(call => call.id);
+        const { data: participantData, error: participantError } = await supabase
+          .from('call_participants')
+          .select('*')
+          .in('call_id', callIds);
+        
+        if (participantError) throw participantError;
+        
+        // Group participants by call_id
+        const participantsByCall: Record<string, Participant[]> = {};
+        participantData?.forEach(participant => {
+          if (!participantsByCall[participant.call_id]) {
+            participantsByCall[participant.call_id] = [];
+          }
+          participantsByCall[participant.call_id].push(participant);
+        });
+        
+        setParticipants(participantsByCall);
+      }
+
+      // Fetch customer contacts
+      await loadCustomerContacts();
+    } catch (err: any) {
+      console.error('Error loading customer data:', err);
+      setError(err.message || 'Failed to load customer data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Load customer contacts
   const loadCustomerContacts = async () => {
@@ -201,6 +306,13 @@ export default function CustomerDetailPage() {
     }
   };
 
+  // Load customer data when customerId changes
+  useEffect(() => {
+    if (customerId) {
+      loadCustomerData();
+    }
+  }, [customerId]);
+
   // Handle contact form input change
   const handleContactFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -220,7 +332,8 @@ export default function CustomerDetailPage() {
       email: '',
       phone: '',
       title: '',
-      is_primary: false
+      is_primary: false,
+      customer_id: customerId // Default to current customer
     });
     setEditingContact(null);
     setShowContactForm(false);
@@ -235,6 +348,9 @@ export default function CustomerDetailPage() {
       return;
     }
     
+    // Ensure we have a valid customer_id
+    const targetCustomerId = contactFormData.customer_id || customerId;
+    
     try {
       if (editingContact) {
         // Update existing contact
@@ -246,6 +362,7 @@ export default function CustomerDetailPage() {
             phone: contactFormData.phone || null,
             title: contactFormData.title || null,
             is_primary: contactFormData.is_primary || false,
+            customer_id: targetCustomerId,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingContact.id);
@@ -256,7 +373,7 @@ export default function CustomerDetailPage() {
         const { error } = await supabase
           .from('customer_contacts')
           .insert({
-            customer_id: customerId,
+            customer_id: targetCustomerId,
             name: contactFormData.name,
             email: contactFormData.email || null,
             phone: contactFormData.phone || null,
@@ -267,16 +384,130 @@ export default function CustomerDetailPage() {
         if (error) throw error;
       }
       
-      // Reload contacts
-      await loadCustomerContacts();
-      resetContactForm();
+      // If contact was moved to another company, we may need to redirect
+      if (editingContact && targetCustomerId !== customerId) {
+        // Reload the contacts list first
+        await loadCustomerContacts();
+        resetContactForm();
+        
+        // Show a success message that the contact was moved
+        const targetCompany = availableCompanies.find(c => c.id === targetCustomerId);
+        setContactsError(`Contact successfully moved to ${targetCompany?.name || 'another company'}`);
+      } else {
+        // Regular save - just reload contacts
+        await loadCustomerContacts();
+        resetContactForm();
+      }
     } catch (err: any) {
       console.error('Error saving contact:', err);
       setContactsError(err.message || 'Failed to save contact');
     }
   };
 
-  // Edit contact
+  // Function to open the customer edit modal from a contact
+  const openCustomerEditModal = async (contact: CustomerContact) => {
+    setSelectedContactForEdit(contact);
+    setCustomerEditLoading(true);
+    
+    // Get target customer ID from contact
+    const targetCustomerId = contact.customer_id || customerId;
+    
+    try {
+      // Fetch the customer details
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', targetCustomerId)
+        .single();
+        
+      if (error) throw error;
+      
+      // Initialize the form with customer data
+      setCustomerEditData({
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        website: data.website || '',
+        address: data.address || '',
+        customer_type: data.customer_type || '',
+        industry: data.industry || ''
+      });
+    } catch (err) {
+      console.error('Error fetching customer details:', err);
+      setError('Failed to load customer details');
+    } finally {
+      setCustomerEditLoading(false);
+    }
+    
+    // Show the modal
+    setShowCustomerEditModal(true);
+  };
+  
+  // Handle customer edit form change
+  const handleCustomerEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setCustomerEditData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  // Save customer edit changes
+  const saveCustomerEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!customerEditData.name) {
+      alert('Company name is required');
+      return;
+    }
+    
+    setCustomerEditLoading(true);
+    setError(null);
+    
+    try {
+      const targetCustomerId = selectedContactForEdit?.customer_id || customerId;
+      
+      // Update the customer record
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          name: customerEditData.name,
+          email: customerEditData.email || null,
+          phone: customerEditData.phone || null,
+          website: customerEditData.website || null,
+          address: customerEditData.address || null,
+          customer_type: customerEditData.customer_type || null,
+          industry: customerEditData.industry || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', targetCustomerId);
+        
+      if (error) throw error;
+      
+      // Show success message
+      setError(`Company details successfully updated${targetCustomerId !== customerId ? ' for another customer' : ''}`);
+      
+      // Refresh data
+      if (targetCustomerId === customerId) {
+        // If we updated the current customer, refresh customer data
+        await loadCustomerData();
+      } else {
+        // Otherwise just refresh the companies list
+        await loadAvailableCompanies();
+      }
+      
+      // Close the modal
+      setShowCustomerEditModal(false);
+      setSelectedContactForEdit(null);
+    } catch (err: any) {
+      console.error('Error updating customer:', err);
+      setError(err.message || 'Failed to update customer');
+    } finally {
+      setCustomerEditLoading(false);
+    }
+  };
+  
+  // Traditional Edit contact function (kept for backward compatibility)
   const handleEditContact = (contact: CustomerContact) => {
     setEditingContact(contact);
     setContactFormData({
@@ -284,7 +515,8 @@ export default function CustomerDetailPage() {
       email: contact.email || '',
       phone: contact.phone || '',
       title: contact.title || '',
-      is_primary: contact.is_primary
+      is_primary: contact.is_primary,
+      customer_id: contact.customer_id || customerId
     });
     setShowContactForm(true);
   };
@@ -346,6 +578,168 @@ export default function CustomerDetailPage() {
         </div>
       )}
       
+      {/* Customer Edit Modal */}
+      {showCustomerEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold">
+                Edit Company Information
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {selectedContactForEdit ? `Editing company for contact: ${selectedContactForEdit.name}` : 'Edit company details'}
+              </p>
+            </div>
+            
+            <form onSubmit={saveCustomerEdit}>
+              <div className="p-6 space-y-4">
+                {customerEditLoading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+                    <p className="mt-2 text-gray-500">Loading company details...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Company Name *
+                        </label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={customerEditData.name || ''}
+                          onChange={handleCustomerEditChange}
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          name="email"
+                          value={customerEditData.email || ''}
+                          onChange={handleCustomerEditChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Phone
+                        </label>
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={customerEditData.phone || ''}
+                          onChange={handleCustomerEditChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Website
+                        </label>
+                        <input
+                          type="url"
+                          name="website"
+                          value={customerEditData.website || ''}
+                          onChange={handleCustomerEditChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Address
+                        </label>
+                        <input
+                          type="text"
+                          name="address"
+                          value={customerEditData.address || ''}
+                          onChange={handleCustomerEditChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Customer Type
+                        </label>
+                        <select
+                          name="customer_type"
+                          value={customerEditData.customer_type || ''}
+                          onChange={handleCustomerEditChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="">Select Type</option>
+                          <option value="enterprise">Enterprise</option>
+                          <option value="mid-market">Mid-Market</option>
+                          <option value="smb">Small Business</option>
+                          <option value="startup">Startup</option>
+                          <option value="individual">Individual</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Industry
+                        </label>
+                        <select
+                          name="industry"
+                          value={customerEditData.industry || ''}
+                          onChange={handleCustomerEditChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="">Select Industry</option>
+                          <option value="technology">Technology</option>
+                          <option value="healthcare">Healthcare</option>
+                          <option value="finance">Finance</option>
+                          <option value="education">Education</option>
+                          <option value="retail">Retail</option>
+                          <option value="manufacturing">Manufacturing</option>
+                          <option value="entertainment">Entertainment</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              <div className="p-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerEditModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  disabled={customerEditLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                  disabled={customerEditLoading}
+                >
+                  {customerEditLoading && (
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -354,7 +748,20 @@ export default function CustomerDetailPage() {
         <>
           {/* Customer Info Card */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-xl font-semibold mb-4">Customer Information</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Customer Information</h2>
+              <button
+                onClick={() => {
+                  if (customer) resetCompanyForm(customer);
+                  setShowEditModal(true);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Edit Company
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>
                 <p className="text-sm text-gray-500">Name</p>
@@ -430,6 +837,152 @@ export default function CustomerDetailPage() {
             </div>
           </div>
           
+          {/* Edit Company Modal */}
+          {showEditModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-semibold">Edit Company Details</h3>
+                  <button 
+                    onClick={() => setShowEditModal(false)}
+                    className="text-gray-500 hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                <form onSubmit={saveCompanyChanges} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Company Name *
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={companyFormData.name || ''}
+                        onChange={handleCompanyFormChange}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={companyFormData.email || ''}
+                        onChange={handleCompanyFormChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={companyFormData.phone || ''}
+                        onChange={handleCompanyFormChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Website
+                      </label>
+                      <input
+                        type="url"
+                        name="website"
+                        value={companyFormData.website || ''}
+                        onChange={handleCompanyFormChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Customer Type
+                      </label>
+                      <select
+                        name="customer_type"
+                        value={companyFormData.customer_type || ''}
+                        onChange={handleCompanyFormChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Select Type</option>
+                        <option value="enterprise">Enterprise</option>
+                        <option value="mid-market">Mid-Market</option>
+                        <option value="smb">Small Business</option>
+                        <option value="startup">Startup</option>
+                        <option value="individual">Individual</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Industry
+                      </label>
+                      <select
+                        name="industry"
+                        value={companyFormData.industry || ''}
+                        onChange={handleCompanyFormChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Select Industry</option>
+                        <option value="technology">Technology</option>
+                        <option value="healthcare">Healthcare</option>
+                        <option value="finance">Finance</option>
+                        <option value="education">Education</option>
+                        <option value="retail">Retail</option>
+                        <option value="manufacturing">Manufacturing</option>
+                        <option value="entertainment">Entertainment</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Address
+                      </label>
+                      <textarea
+                        name="address"
+                        value={companyFormData.address || ''}
+                        onChange={handleCompanyFormChange}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowEditModal(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saveLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                    >
+                      {saveLoading && (
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      )}
+                      Save Changes
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+          
           {/* Tabs for Conversations, Calls and Company Contacts */}
           <Tabs defaultValue="contacts" className="w-full">
             <TabsList className="mb-6">
@@ -479,6 +1032,31 @@ export default function CustomerDetailPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
                         </div>
+                        
+                        {/* Company Selection Dropdown */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Company *
+                          </label>
+                          <select
+                            name="customer_id"
+                            value={contactFormData.customer_id || customerId}
+                            onChange={handleContactFormChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          >
+                            {availableCompanies.map(company => (
+                              <option key={company.id} value={company.id}>
+                                {company.name} {company.id === customerId ? '(Current)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                          {contactFormData.customer_id !== customerId && editingContact && (
+                            <p className="mt-1 text-xs text-orange-600">
+                              Warning: Changing company will move this contact to another customer.
+                            </p>
+                          )}
+                        </div>
+                        
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Email
@@ -628,10 +1206,16 @@ export default function CustomerDetailPage() {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                               <button
+                                onClick={() => openCustomerEditModal(contact)}
+                                className="text-blue-600 hover:text-blue-900 mr-4"
+                              >
+                                Edit Customer
+                              </button>
+                              <button
                                 onClick={() => handleEditContact(contact)}
                                 className="text-blue-600 hover:text-blue-900 mr-4"
                               >
-                                Edit
+                                Edit Contact
                               </button>
                               <button
                                 onClick={() => handleDeleteContact(contact.id)}
@@ -779,6 +1363,7 @@ export default function CustomerDetailPage() {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-600 hover:underline flex items-center"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />

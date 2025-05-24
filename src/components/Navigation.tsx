@@ -32,7 +32,9 @@ export default function Navigation() {
         <Link href="/" className="text-xl font-bold text-blue-600 mr-6">Support</Link>
         
         <NavLink href="/conversations">Conversations</NavLink>
+        <NavLink href="/calls">Calls</NavLink>
         <NavLink href="/customers">Customers</NavLink>
+        <NavLink href="/issues">Issues</NavLink>
         <NavLink href="/settings">Settings</NavLink>
       </div>
       

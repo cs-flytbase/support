@@ -1,17 +1,28 @@
-import { clerkMiddleware, createRouteMatcher, getAuth } from '@clerk/nextjs/server';
+import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
-// Create a route matcher for public routes - ONLY sign-in and static assets
-const isPublicRoute = createRouteMatcher([
+// Define public routes - ONLY sign-in and static assets
+const publicRoutes = [
   '/sign-in(.*)',              // Sign-in pages (catches all nested routes)
   '/sign-up(.*)',              // Sign-up pages (catches all nested routes)
   '/_next/static/(.*)',        // Static assets
   '/_next/image/(.*)',         // Image assets
   '/api/webhooks/(.*)',        // Webhook routes
   '/favicon.ico',              // Favicon
-]);
+];
+
+// Helper function to check if a route is public
+const isPublicRoute = (req: NextRequest) => {
+  const path = req.nextUrl.pathname;
+  return publicRoutes.some(route => {
+    // Convert glob pattern to regex
+    const pattern = route.replace(/\(\*\)/g, '.*').replace(/\*/g, '.*');
+    const regex = new RegExp(`^${pattern}$`);
+    return regex.test(path);
+  });
+};
 
 /**
  * Syncs the Clerk user with Supabase database
