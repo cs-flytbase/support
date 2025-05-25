@@ -26,6 +26,7 @@ interface Message {
   platform_timestamp?: string;
   is_from_me: boolean;
   metadata?: any;
+  sender_display_name?: string; // Added for displaying sender information
 }
 
 interface ConversationDetails {
@@ -217,7 +218,7 @@ export default function ConversationDetailPage({ params }: PageProps) {
       const processedMessages = (messagesData || []).map(message => {
         // Find the corresponding conversation member for the sender
         const senderMember = conversationData.conversation_members?.find(
-          member => member.external_id === message.sender_id
+          (member: { external_id: string; name?: string; }) => member.external_id === message.sender_id
         );
         
         // Determine if this message is from the current user (based on sender_id being null)
