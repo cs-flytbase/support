@@ -595,7 +595,7 @@ const ConversationsPage = () => {
 
       {/* Add Conversation Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add a new conversation</DialogTitle>
             <DialogDescription>
@@ -734,7 +734,7 @@ const ConversationsPage = () => {
             {chats.length > 0 && (
               <div className="mt-4">
                 <h4 className="font-medium mb-2">Select Conversations to Import</h4>
-                <div className="max-h-[300px] overflow-y-auto border rounded-md p-2">
+                <div className="max-h-[200px] overflow-y-auto border rounded-md p-2">
                   {chats.map(chat => (
                     <div key={chat.chat_id} className="flex items-center p-2 hover:bg-gray-100 rounded-md">
                       <input
@@ -762,7 +762,7 @@ const ConversationsPage = () => {
                   ))}
                 </div>
                 <Button 
-                  className="mt-4 w-full" 
+                  className="mt-4 w-full sticky bottom-0" 
                   disabled={selectedChats.length === 0 || isImporting}
                   onClick={importSelectedChats}
                 >

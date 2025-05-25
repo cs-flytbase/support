@@ -19,8 +19,11 @@ interface Message {
   id: string;
   conversation_id: string;
   sender_id?: string;
-  content: string;
+  sender_name?: string;
+  text?: string; // The actual message content is in text field
+  content?: string; // Keeping for backward compatibility
   created_at: string;
+  platform_timestamp?: string;
   is_from_me: boolean;
   metadata?: any;
 }
@@ -206,11 +209,42 @@ export default function ConversationDetailPage({ params }: PageProps) {
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: false })
         .limit(100);
         
       if (msgError) throw new Error('Failed to load messages');
-      setMessages(messagesData || []);
+      
+      // Process messages to determine if they're from the current user and set the proper content
+      const processedMessages = (messagesData || []).map(message => {
+        // Find the corresponding conversation member for the sender
+        const senderMember = conversationData.conversation_members?.find(
+          member => member.external_id === message.sender_id
+        );
+        
+        // Determine if this message is from the current user (based on sender_id being null)
+        // This assumes messages sent by the current user have null sender_id
+        // Adjust this logic based on your specific implementation
+        const isFromMe = message.sender_id === null; 
+        
+        return {
+          ...message,
+          is_from_me: isFromMe,
+          // Prioritize sender_id, then fallback to name if necessary
+          sender_display_name: message.sender_id || senderMember?.name || message.sender_name || 'Unknown'
+        };
+      });
+      
+      // Sort messages by platform_timestamp first, falling back to created_at
+      // This ensures most accurate chronological order
+      const sortedMessages = processedMessages.sort((a, b) => {
+        // Use platform_timestamp if available, otherwise use created_at
+        const timestampA = a.platform_timestamp || a.created_at;
+        const timestampB = b.platform_timestamp || b.created_at;
+        
+        // Compare timestamps (newer messages come first in the array)
+        return new Date(timestampB).getTime() - new Date(timestampA).getTime();
+      });
+      
+      setMessages(sortedMessages);
       
       // Fetch available AI agents
       const { data: agentsData, error: agentError } = await supabase
@@ -672,6 +706,18 @@ export default function ConversationDetailPage({ params }: PageProps) {
                         message.is_from_me ? 'justify-end' : 'justify-start'
                       }`}
                     >
+                      {/* Show sender avatar/icon for messages not from current user */}
+                      {!message.is_from_me && conversation?.is_group && (
+                        <div className="flex-shrink-0 mr-2 self-end mb-1">
+                          <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs overflow-hidden">
+                            {message.sender_display_name ? (
+                              message.sender_display_name.charAt(0).toUpperCase()
+                            ) : (
+                              <User size={16} />
+                            )}
+                          </div>
+                        </div>
+                      )}
                       <div
                         className={`max-w-[80%] p-3 rounded-lg ${
                           message.is_from_me
@@ -679,13 +725,24 @@ export default function ConversationDetailPage({ params }: PageProps) {
                             : 'bg-gray-100 rounded-tl-none'
                         }`}
                       >
-                        {message.content}
+                        {/* Show sender ID for group chats */}
+                        {!message.is_from_me && conversation?.is_group && (
+                          <div className="font-medium text-xs mb-1 text-gray-700">
+                            {message.sender_id || message.sender_display_name || 'Unknown'}
+                          </div>
+                        )}
+                        {/* Display the message text */}
+                        <div className="whitespace-pre-wrap break-words">
+                          {message.text || message.content || 'Empty message'}
+                        </div>
                         <div
                           className={`text-xs mt-1 ${
                             message.is_from_me ? 'text-blue-100' : 'text-gray-500'
                           }`}
                         >
-                          {new Date(message.created_at).toLocaleString()}
+                          {message.platform_timestamp ? 
+                            new Date(message.platform_timestamp).toLocaleString() : 
+                            new Date(message.created_at).toLocaleString()}
                         </div>
                       </div>
                     </div>
@@ -699,7 +756,7 @@ export default function ConversationDetailPage({ params }: PageProps) {
         {/* Info and AI Agents Section */}
         <div className="col-span-1">
           <Tabs defaultValue="members">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-3 text-xs sm:text-sm">
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="members">Members</TabsTrigger>
               <TabsTrigger value="agents">AI Agents</TabsTrigger>
@@ -709,46 +766,46 @@ export default function ConversationDetailPage({ params }: PageProps) {
             <TabsContent value="details" className="mt-4">
               {conversation && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Conversation Details</CardTitle>
+                  <CardHeader className="pb-3 sm:pb-6">
+                    <CardTitle className="text-lg sm:text-xl">Conversation Details</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div>
-                        <h4 className="text-sm font-medium mb-1">Title</h4>
-                        <p className="text-base">{conversation.title || 'Untitled'}</p>
+                        <h4 className="text-xs sm:text-sm font-medium mb-1">Title</h4>
+                        <p className="text-sm sm:text-base break-words">{conversation.title || 'Untitled'}</p>
                       </div>
                       <div>
-                        <h4 className="text-sm font-medium mb-1">Platform</h4>
-                        <p className="text-base capitalize">{conversation.platform_type}</p>
+                        <h4 className="text-xs sm:text-sm font-medium mb-1">Platform</h4>
+                        <p className="text-sm sm:text-base capitalize">{conversation.platform_type}</p>
                       </div>
                       <div>
-                        <h4 className="text-sm font-medium mb-1">Created</h4>
-                        <p className="text-base">{new Date(conversation.created_at).toLocaleString()}</p>
+                        <h4 className="text-xs sm:text-sm font-medium mb-1">Created</h4>
+                        <p className="text-sm sm:text-base">{new Date(conversation.created_at).toLocaleString()}</p>
                       </div>
                       <div>
-                        <h4 className="text-sm font-medium mb-1">Group Chat</h4>
-                        <p className="text-base">{conversation.is_group ? 'Yes' : 'No'}</p>
+                        <h4 className="text-xs sm:text-sm font-medium mb-1">Group Chat</h4>
+                        <p className="text-sm sm:text-base">{conversation.is_group ? 'Yes' : 'No'}</p>
                       </div>
                     </div>
                     
                     {/* Customer information */}
-                    <div className="mt-6">
-                      <h4 className="text-sm font-medium mb-3">Customer</h4>
-                      <div className="flex items-center justify-between">
-                        <div>
+                    <div className="mt-4 sm:mt-6">
+                      <h4 className="text-xs sm:text-sm font-medium mb-2 sm:mb-3">Customer</h4>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+                        <div className="w-full sm:w-auto">
                           {customer ? (
-                            <div className="flex items-center space-x-3 p-3 border rounded-md">
-                              <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
-                                <User className="h-6 w-6 text-green-600" />
+                            <div className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 border rounded-md">
+                              <div className="h-8 w-8 sm:h-10 sm:w-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <User className="h-4 w-4 sm:h-6 sm:w-6 text-green-600" />
                               </div>
-                              <div>
-                                <p className="font-medium">{customer.name}</p>
-                                <p className="text-sm text-gray-500">{customer.email || 'No email'} | {customer.phone || 'No phone'}</p>
+                              <div className="overflow-hidden">
+                                <p className="font-medium text-sm sm:text-base truncate">{customer.name}</p>
+                                <p className="text-xs sm:text-sm text-gray-500 truncate">{customer.email || 'No email'} | {customer.phone || 'No phone'}</p>
                               </div>
                             </div>
                           ) : (
-                            <p className="text-gray-500 italic">No customer assigned</p>
+                            <p className="text-gray-500 italic text-sm sm:text-base">No customer assigned</p>
                           )}
                         </div>
                         <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
@@ -819,16 +876,16 @@ export default function ConversationDetailPage({ params }: PageProps) {
                     </div>
                     
                     {/* Conversation members - Enhanced display */}
-                    <div className="mt-6">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-medium">Conversation Members ({conversation.conversation_members?.length || 0})</h4>
+                    <div className="mt-4 sm:mt-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 sm:mb-3 gap-2 sm:gap-0">
+                        <h4 className="text-xs sm:text-sm font-medium">Conversation Members ({conversation.conversation_members?.length || 0})</h4>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => {
                             fetchConversationData();
                           }}
-                          className="text-xs"
+                          className="text-xs w-full sm:w-auto"
                         >
                           <RefreshCcw size={12} className="mr-1" /> Refresh
                         </Button>
@@ -839,14 +896,14 @@ export default function ConversationDetailPage({ params }: PageProps) {
                           <p className="text-gray-500">No members found for this conversation</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto -mx-4 sm:mx-0">
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                <th className="px-4 py-2 border-b">Member</th>
-                                <th className="px-4 py-2 border-b">External ID</th>
-                                <th className="px-4 py-2 border-b">Role</th>
-                                <th className="px-4 py-2 border-b">Joined</th>
+                                <th className="px-2 sm:px-4 py-2 border-b">Member</th>
+                                <th className="px-2 sm:px-4 py-2 border-b hidden sm:table-cell">External ID</th>
+                                <th className="px-2 sm:px-4 py-2 border-b">Role</th>
+                                <th className="px-2 sm:px-4 py-2 border-b hidden sm:table-cell">Joined</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -856,36 +913,36 @@ export default function ConversationDetailPage({ params }: PageProps) {
                                 
                                 return (
                                   <tr key={member.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 whitespace-nowrap">
-                                      <div className="flex items-center space-x-3">
-                                        <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <td className="px-2 sm:px-4 py-2 sm:py-3">
+                                      <div className="flex items-center space-x-2 sm:space-x-3">
+                                        <div className="h-8 w-8 sm:h-10 sm:w-10 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
                                           {member.avatar_url ? (
                                             <img 
                                               src={member.avatar_url} 
                                               alt={member.name || 'Participant'} 
-                                              className="h-10 w-10 rounded-full object-cover"
+                                              className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover"
                                             />
                                           ) : (
-                                            <User className="h-6 w-6 text-gray-500" />
+                                            <User className="h-4 w-4 sm:h-6 sm:w-6 text-gray-500" />
                                           )}
                                         </div>
-                                        <div>
-                                          <p className="font-medium">{member.name || 'Unknown'}</p>
-                                          <p className="text-xs text-gray-500">{metadata.phone_number || member.phone_number || 'No phone number'}</p>
+                                        <div className="truncate">
+                                          <p className="font-medium text-xs sm:text-sm truncate">{member.name || 'Unknown'}</p>
+                                          <p className="text-xs text-gray-500 truncate">{metadata.phone_number || member.phone_number || 'No phone'}</p>
                                         </div>
                                       </div>
                                     </td>
-                                    <td className="px-4 py-3 whitespace-nowrap">
-                                      <span className="text-sm">{member.external_id || 'N/A'}</span>
+                                    <td className="px-2 sm:px-4 py-2 sm:py-3 hidden sm:table-cell">
+                                      <span className="text-xs sm:text-sm truncate">{member.external_id || 'N/A'}</span>
                                     </td>
-                                    <td className="px-4 py-3 whitespace-nowrap">
+                                    <td className="px-2 sm:px-4 py-2 sm:py-3">
                                       {member.is_admin ? (
-                                        <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Admin</span>
+                                        <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Admin</span>
                                       ) : (
-                                        <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">Member</span>
+                                        <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">Member</span>
                                       )}
                                     </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-2 sm:px-4 py-2 sm:py-3 hidden sm:table-cell text-xs sm:text-sm text-gray-500">
                                       {member.created_at ? new Date(member.created_at).toLocaleDateString() : 'Unknown'}
                                     </td>
                                   </tr>

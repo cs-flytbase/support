@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { createClient } from '@/utils/supabase/client';
 import Navigation from '@/components/Navigation';
+import { Toaster } from 'react-hot-toast';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -63,9 +64,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      <main className="container mx-auto py-6 px-4">
+      <main className="container mx-auto py-4 px-3 sm:py-6 sm:px-4 md:px-6 lg:px-8">
         {children}
       </main>
+      <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
     </div>
   );
 }

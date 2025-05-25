@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 
 // Types for our data
 type Issue = {
@@ -80,6 +81,10 @@ export default function IssueDetailPage({ params }: PageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [issueId, setIssueId] = useState<string>('');
+  const [editingCallMention, setEditingCallMention] = useState<CallMention | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const router = useRouter();
   const supabase = createClient();
@@ -233,6 +238,67 @@ export default function IssueDetailPage({ params }: PageProps) {
   const navigateToCustomer = (customerId: string) => {
     router.push(`/customers/${customerId}`);
   };
+
+  // Open edit modal for a call mention
+  const openEditModal = (mention: CallMention, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent navigation to call
+    setEditingCallMention(mention);
+    setSelectedCustomerId(mention.customer_id);
+    setIsEditModalOpen(true);
+  };
+
+  // Close edit modal
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingCallMention(null);
+    setSelectedCustomerId('');
+  };
+
+  // Update call mention customer
+  const updateCallMentionCustomer = async () => {
+    if (!editingCallMention || !selectedCustomerId) return;
+    
+    setIsUpdating(true);
+    try {
+      // Update the call mention in the database
+      const { error: updateError } = await supabase
+        .from('issue_call_mentions')
+        .update({ customer_id: selectedCustomerId })
+        .eq('id', editingCallMention.id);
+      
+      if (updateError) throw updateError;
+      
+      // Get updated customer info
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select('id, name')
+        .eq('id', selectedCustomerId)
+        .single();
+      
+      if (customerError) throw customerError;
+      
+      // Update local state
+      setCallMentions(prevMentions => 
+        prevMentions.map(mention => 
+          mention.id === editingCallMention.id 
+            ? { 
+                ...mention, 
+                customer_id: selectedCustomerId,
+                customer_name: customerData.name 
+              } 
+            : mention
+        )
+      );
+      
+      toast.success('Call mention updated successfully');
+      closeEditModal();
+    } catch (err: any) {
+      console.error('Error updating call mention:', err);
+      toast.error(err.message || 'Failed to update call mention');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
   
   // Get styling based on sentiment
   const getSentimentStyle = (sentiment: string | null) => {
@@ -295,26 +361,26 @@ export default function IssueDetailPage({ params }: PageProps) {
   return (
     <div className="container mx-auto p-6">
       {/* Header with back button */}
-      <div className="flex items-center mb-6">
+      <div className="flex flex-wrap items-center mb-4 sm:mb-6">
         <button
           onClick={handleBack}
-          className="mr-4 p-2 rounded-full hover:bg-gray-200 transition-colors"
+          className="mr-3 sm:mr-4 p-2 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
         </button>
-        <h1 className="text-3xl font-bold">{issue.title}</h1>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold break-words">{issue.title}</h1>
       </div>
       
       {/* Issue details card */}
-      <div className="bg-white rounded-lg shadow-md mb-8 overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-semibold mb-2">Issue Details</h2>
-              <div className="flex space-x-4 mb-4">
-                <span className={`px-3 py-1 rounded-full text-sm font-semibold 
+      <div className="bg-white rounded-lg shadow-md mb-6 sm:mb-8 overflow-hidden">
+        <div className="p-4 sm:p-6 border-b border-gray-200">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start">
+            <div className="mb-4 lg:mb-0">
+              <h2 className="text-xl sm:text-2xl font-semibold mb-2">Issue Details</h2>
+              <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+                <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold 
                   ${issue.status === 'open' ? 'bg-red-100 text-red-800' : ''}
                   ${issue.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' : ''}
                   ${issue.status === 'resolved' ? 'bg-green-100 text-green-800' : ''}
@@ -322,7 +388,7 @@ export default function IssueDetailPage({ params }: PageProps) {
                 `}>
                   Status: {issue.status ? issue.status.replace('_', ' ') : 'Unknown'}
                 </span>
-                <span className={`px-3 py-1 rounded-full text-sm font-semibold 
+                <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold 
                   ${issue.priority === 'low' ? 'bg-blue-100 text-blue-800' : ''}
                   ${issue.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : ''}
                   ${issue.priority === 'high' ? 'bg-orange-100 text-orange-800' : ''}
@@ -331,18 +397,18 @@ export default function IssueDetailPage({ params }: PageProps) {
                   Priority: {issue.priority || 'Unknown'}
                 </span>
                 {issue.category && (
-                  <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-semibold">
+                  <span className="px-2 sm:px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-xs sm:text-sm font-semibold">
                     Category: {issue.category}
                   </span>
                 )}
                 {issue.issue_type && (
-                  <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">
+                  <span className="px-2 sm:px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs sm:text-sm font-semibold">
                     Type: {issue.issue_type.replace('_', ' ')}
                   </span>
                 )}
               </div>
             </div>
-            <div className="text-right text-sm text-gray-500">
+            <div className="text-sm text-gray-500 lg:text-right">
               <div>Created: {formatDate(issue.created_at)}</div>
               <div>Last Updated: {formatDate(issue.updated_at)}</div>
               {issue.first_identified && (
@@ -378,7 +444,7 @@ export default function IssueDetailPage({ params }: PageProps) {
           {customers.length === 0 ? (
             <p className="text-gray-500">No customers associated with this issue.</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {customers.map(customer => (
                 <div 
                   key={customer.id} 
@@ -436,7 +502,7 @@ export default function IssueDetailPage({ params }: PageProps) {
           {callMentions.length === 0 ? (
             <p className="text-gray-500">No call mentions found for this issue.</p>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {callMentions.map(mention => (
                 <div 
                   key={mention.id} 
@@ -446,7 +512,15 @@ export default function IssueDetailPage({ params }: PageProps) {
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="font-medium">{mention.call_title}</div>
-                      <div className="text-sm text-gray-600">Customer: {mention.customer_name}</div>
+                      <div className="flex items-center">
+                        <div className="text-sm text-gray-600 mr-2">Customer: {mention.customer_name}</div>
+                        <button 
+                          onClick={(e) => openEditModal(mention, e)}
+                          className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 px-2 py-1 rounded-md"
+                        >
+                          Edit
+                        </button>
+                      </div>
                       {mention.mentioned_by && (
                         <div className="text-sm text-gray-600">Mentioned by: {mention.mentioned_by}</div>
                       )}
@@ -516,6 +590,60 @@ export default function IssueDetailPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      {/* Edit Call Mention Modal */}
+      {isEditModalOpen && editingCallMention && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-semibold mb-4">Edit Call Mention</h3>
+            
+            <div className="mb-4">
+              <p className="text-gray-700 mb-2">Call: {editingCallMention.call_title}</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Select Customer
+              </label>
+              <select
+                value={selectedCustomerId}
+                onChange={(e) => setSelectedCustomerId(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isUpdating}
+              >
+                <option value="">Select a customer</option>
+                {customers.map(customer => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={closeEditModal}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                disabled={isUpdating}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={updateCallMentionCustomer}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                disabled={isUpdating || !selectedCustomerId}
+              >
+                {isUpdating ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Updating
+                  </span>
+                ) : 'Update'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

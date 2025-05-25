@@ -66,7 +66,7 @@ export default function CallsPage() {
       setError(null);
       
       try {
-        // Start building query
+        // Start building query to get calls
         let query = supabase
           .from('calls')
           .select(`
@@ -79,8 +79,7 @@ export default function CallsPage() {
             actual_start_time,
             end_time,
             created_at,
-            recording_url,
-            customers(name)
+            recording_url
           `);
         
         // Apply time filter
@@ -118,10 +117,37 @@ export default function CallsPage() {
         
         if (error) throw error;
         
+        // Get all unique customer IDs
+        const customerIds = Array.from(new Set(
+          data
+            .map(call => call.customer_id)
+            .filter(id => id) // Filter out null/undefined IDs
+        ));
+        
+        // Create a map to store customer names
+        const customerMap: Record<string, string> = {};
+        
+        // If we have customer IDs, fetch their details
+        if (customerIds.length > 0) {
+          const { data: customerData, error: customerError } = await supabase
+            .from('customers')
+            .select('id, name')
+            .in('id', customerIds);
+          
+          if (customerError) throw customerError;
+          
+          // Populate the customer map
+          (customerData || []).forEach(customer => {
+            customerMap[customer.id] = customer.name;
+          });
+        }
+        
         // Format the data to include customer name
         const formattedCalls = data.map(call => ({
           ...call,
-          customer_name: Array.isArray(call.customers) && call.customers[0]?.name ? call.customers[0].name : 'Unknown Customer'
+          customer_name: call.customer_id && customerMap[call.customer_id] 
+            ? customerMap[call.customer_id] 
+            : 'Unknown Customer'
         }));
         
         setCalls(formattedCalls);
