@@ -3,76 +3,28 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useParams, useRouter } from "next/navigation";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-interface CustomerDetails {
-  id: string;
-  name: string;
-  email: string | null;
-  website: string | null;
-  phone: string | null;
-  address: string | null;
-  customer_type: string | null;
-  industry: string | null;
-  created_at: string;
-  updated_at: string;
-}
+// Import components
+import { CustomerInfoCard } from "./components/CustomerInfoCard";
+import { EditCustomerModal } from "./components/EditCustomerModal";
+import { OrganizationSection } from "./components/OrganizationSection";
+import { ContactsSection } from "./components/ContactsSection";
+import { CommunicationTabs } from "./components/CommunicationTabs";
+import { CustomerProfileSection } from "./components/CustomerProfileSection";
+import { GoalsSection } from "./components/GoalsSection";
+import { KeyDeliverablesSection } from "./components/KeyDeliverablesSection";
 
-interface OrgDetails {
-  org_id: string;
-  org_name: string;
-  customer_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface CustomerContact {
-  id: string;
-  customer_id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  title: string | null;
-  is_primary: boolean;
-  metadata: any | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Conversation {
-  id: string;
-  title: string;
-  platform_type: string;
-  is_group: boolean;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  last_message_at: string | null;
-}
-
-interface Call {
-  id: string;
-  name: string;
-  duration: number;
-  meeting_url: string | null;
-  recording_url: string | null;
-  scheduled_start_time: string | null;
-  actual_start_time: string | null;
-  end_time: string | null;
-  status: string;
-  created_at: string;
-}
-
-interface Participant {
-  id: string;
-  call_id: string;
-  participant_type: string;
-  agent_id: string | null;
-  name: string;
-  role: string;
-  joined_at: string | null;
-  left_at: string | null;
-}
+// Import types
+import { 
+  CustomerDetails, 
+  OrgDetails, 
+  CustomerContact, 
+  Conversation, 
+  Call, 
+  Participant,
+  CustomerGoal,
+  KeyDeliverable
+} from "./types";
 
 export default function CustomerDetailPage() {
   const supabase = createClient();
@@ -89,6 +41,19 @@ export default function CustomerDetailPage() {
   const [participants, setParticipants] = useState<Record<string, Participant[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [contactsError, setContactsError] = useState<string | null>(null);
+  
+  // Goals state
+  const [goals, setGoals] = useState<CustomerGoal[]>([]);
+  const [goalsLoading, setGoalsLoading] = useState(true);
+  const [goalsError, setGoalsError] = useState<string | null>(null);
+  
+  // Key deliverables state
+  const [deliverables, setDeliverables] = useState<KeyDeliverable[]>([]);
+  const [deliverablesLoading, setDeliverablesLoading] = useState(true);
+  const [deliverablesError, setDeliverablesError] = useState<string | null>(null);
+  
+  // Profile updating state
+  const [profileSaving, setProfileSaving] = useState(false);
   
   // Organization state
   const [orgs, setOrgs] = useState<OrgDetails[]>([]);
@@ -217,7 +182,7 @@ export default function CustomerDetailPage() {
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('id, name, email, website, phone, address, customer_type, industry, created_at, updated_at')
+        .select('id, name, email, website, phone, address, customer_type, industry, customer_profile, customer_profile_update_time, created_at, updated_at')
         .order('name', { ascending: true });
       
       if (error) throw error;
@@ -249,6 +214,12 @@ export default function CustomerDetailPage() {
       
       setCustomer(customerData);
       resetCompanyForm(customerData);
+      
+      // Load goals and deliverables
+      await Promise.all([
+        loadGoals(),
+        loadKeyDeliverables()
+      ]);
 
       // Load organization data
       await loadOrganizationData();
@@ -427,109 +398,6 @@ export default function CustomerDetailPage() {
     }
   };
 
-  // Function to open the customer edit modal from a contact
-  const openCustomerEditModal = async (contact: CustomerContact) => {
-    setSelectedContactForEdit(contact);
-    setCustomerEditLoading(true);
-    
-    // Get target customer ID from contact
-    const targetCustomerId = contact.customer_id || customerId;
-    
-    try {
-      // Fetch the customer details
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', targetCustomerId)
-        .single();
-        
-      if (error) throw error;
-      
-      // Initialize the form with customer data
-      setCustomerEditData({
-        name: data.name || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        website: data.website || '',
-        address: data.address || '',
-        customer_type: data.customer_type || '',
-        industry: data.industry || ''
-      });
-    } catch (err) {
-      console.error('Error fetching customer details:', err);
-      setError('Failed to load customer details');
-    } finally {
-      setCustomerEditLoading(false);
-    }
-    
-    // Show the modal
-    setShowCustomerEditModal(true);
-  };
-  
-  // Handle customer edit form change
-  const handleCustomerEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setCustomerEditData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-  
-  // Save customer edit changes
-  const saveCustomerEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!customerEditData.name) {
-      alert('Company name is required');
-      return;
-    }
-    
-    setCustomerEditLoading(true);
-    setError(null);
-    
-    try {
-      const targetCustomerId = selectedContactForEdit?.customer_id || customerId;
-      
-      // Update the customer record
-      const { error } = await supabase
-        .from('customers')
-        .update({
-          name: customerEditData.name,
-          email: customerEditData.email || null,
-          phone: customerEditData.phone || null,
-          website: customerEditData.website || null,
-          address: customerEditData.address || null,
-          customer_type: customerEditData.customer_type || null,
-          industry: customerEditData.industry || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', targetCustomerId);
-        
-      if (error) throw error;
-      
-      // Show success message
-      setError(`Company details successfully updated${targetCustomerId !== customerId ? ' for another customer' : ''}`);
-      
-      // Refresh data
-      if (targetCustomerId === customerId) {
-        // If we updated the current customer, refresh customer data
-        await loadCustomerData();
-      } else {
-        // Otherwise just refresh the companies list
-        await loadAvailableCompanies();
-      }
-      
-      // Close the modal
-      setShowCustomerEditModal(false);
-      setSelectedContactForEdit(null);
-    } catch (err: any) {
-      console.error('Error updating customer:', err);
-      setError(err.message || 'Failed to update customer');
-    } finally {
-      setCustomerEditLoading(false);
-    }
-  };
-  
   // Traditional Edit contact function (kept for backward compatibility)
   const handleEditContact = (contact: CustomerContact) => {
     setEditingContact(contact);
@@ -598,6 +466,226 @@ export default function CustomerDetailPage() {
       setOrgsError(err.message || 'Failed to load organization data');
     } finally {
       setOrgsLoading(false);
+    }
+  };
+  
+  // Load customer goals
+  const loadGoals = async () => {
+    setGoalsLoading(true);
+    setGoalsError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('updated_at', { ascending: false });
+      
+      if (error) throw error;
+      setGoals(data || []);
+    } catch (err: any) {
+      console.error('Error loading goals:', err);
+      setGoalsError(err.message || 'Failed to load customer goals');
+    } finally {
+      setGoalsLoading(false);
+    }
+  };
+  
+  // Load key deliverables
+  const loadKeyDeliverables = async () => {
+    setDeliverablesLoading(true);
+    setDeliverablesError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('key_deliverables')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('updated_at', { ascending: false });
+      
+      if (error) throw error;
+      setDeliverables(data || []);
+    } catch (err: any) {
+      console.error('Error loading deliverables:', err);
+      setDeliverablesError(err.message || 'Failed to load key deliverables');
+    } finally {
+      setDeliverablesLoading(false);
+    }
+  };
+  
+  // Update customer profile
+  const updateCustomerProfile = async (profileText: string) => {
+    setProfileSaving(true);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          customer_profile: profileText,
+          // The database trigger will update customer_profile_update_time automatically
+        })
+        .eq('id', customerId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      if (customer) {
+        setCustomer({
+          ...customer,
+          customer_profile: profileText,
+          customer_profile_update_time: new Date().toISOString()
+        });
+      }
+    } catch (err: any) {
+      console.error('Error updating customer profile:', err);
+      setError(err.message || 'Failed to update customer profile');
+      throw err; // Re-throw to be caught by the component
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+  
+  // Add a new goal
+  const addGoal = async (goalText: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .insert([{
+          customer_id: customerId,
+          goal_text: goalText
+        }])
+        .select();
+        
+      if (error) throw error;
+      
+      // Update local state
+      if (data && data.length > 0) {
+        setGoals(prevGoals => [data[0], ...prevGoals]);
+      }
+    } catch (err: any) {
+      console.error('Error adding goal:', err);
+      setGoalsError(err.message || 'Failed to add goal');
+      throw err;
+    }
+  };
+  
+  // Update an existing goal
+  const updateGoal = async (goalId: string, goalText: string) => {
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .update({
+          goal_text: goalText,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', goalId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setGoals(prevGoals => prevGoals.map(goal => 
+        goal.id === goalId 
+          ? { ...goal, goal_text: goalText, updated_at: new Date().toISOString() }
+          : goal
+      ));
+    } catch (err: any) {
+      console.error('Error updating goal:', err);
+      setGoalsError(err.message || 'Failed to update goal');
+      throw err;
+    }
+  };
+  
+  // Delete a goal
+  const deleteGoal = async (goalId: string) => {
+    if (!confirm('Are you sure you want to delete this goal?')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .delete()
+        .eq('id', goalId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setGoals(prevGoals => prevGoals.filter(goal => goal.id !== goalId));
+    } catch (err: any) {
+      console.error('Error deleting goal:', err);
+      setGoalsError(err.message || 'Failed to delete goal');
+    }
+  };
+  
+  // Add a new key deliverable
+  const addKeyDeliverable = async (deliverableText: string, isEditable: boolean) => {
+    try {
+      const { data, error } = await supabase
+        .from('key_deliverables')
+        .insert([{
+          customer_id: customerId,
+          deliverable_text: deliverableText,
+          is_editable: isEditable
+        }])
+        .select();
+        
+      if (error) throw error;
+      
+      // Update local state
+      if (data && data.length > 0) {
+        setDeliverables(prevDeliverables => [data[0], ...prevDeliverables]);
+      }
+    } catch (err: any) {
+      console.error('Error adding deliverable:', err);
+      setDeliverablesError(err.message || 'Failed to add deliverable');
+      throw err;
+    }
+  };
+  
+  // Update an existing deliverable
+  const updateKeyDeliverable = async (deliverableId: string, deliverableText: string) => {
+    try {
+      const { error } = await supabase
+        .from('key_deliverables')
+        .update({
+          deliverable_text: deliverableText,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', deliverableId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setDeliverables(prevDeliverables => prevDeliverables.map(deliverable => 
+        deliverable.id === deliverableId 
+          ? { ...deliverable, deliverable_text: deliverableText, updated_at: new Date().toISOString() }
+          : deliverable
+      ));
+    } catch (err: any) {
+      console.error('Error updating deliverable:', err);
+      setDeliverablesError(err.message || 'Failed to update deliverable');
+      throw err;
+    }
+  };
+  
+  // Delete a deliverable
+  const deleteKeyDeliverable = async (deliverableId: string) => {
+    if (!confirm('Are you sure you want to delete this deliverable?')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('key_deliverables')
+        .delete()
+        .eq('id', deliverableId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setDeliverables(prevDeliverables => prevDeliverables.filter(deliverable => deliverable.id !== deliverableId));
+    } catch (err: any) {
+      console.error('Error deleting deliverable:', err);
+      setDeliverablesError(err.message || 'Failed to delete deliverable');
     }
   };
 
@@ -755,992 +843,120 @@ export default function CustomerDetailPage() {
         </div>
       )}
       
-      {/* Customer Edit Modal */}
-      {showCustomerEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold">
-                Edit Company Information
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">
-                {selectedContactForEdit ? `Editing company for contact: ${selectedContactForEdit.name}` : 'Edit company details'}
-              </p>
-            </div>
-            
-            <form onSubmit={saveCustomerEdit}>
-              <div className="p-6 space-y-4">
-                {customerEditLoading ? (
-                  <div className="text-center py-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-                    <p className="mt-2 text-gray-500">Loading company details...</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Company Name *
-                        </label>
-                        <input
-                          type="text"
-                          name="name"
-                          value={customerEditData.name || ''}
-                          onChange={handleCustomerEditChange}
-                          required
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          name="email"
-                          value={customerEditData.email || ''}
-                          onChange={handleCustomerEditChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Phone
-                        </label>
-                        <input
-                          type="tel"
-                          name="phone"
-                          value={customerEditData.phone || ''}
-                          onChange={handleCustomerEditChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Website
-                        </label>
-                        <input
-                          type="url"
-                          name="website"
-                          value={customerEditData.website || ''}
-                          onChange={handleCustomerEditChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
-                      
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Address
-                        </label>
-                        <input
-                          type="text"
-                          name="address"
-                          value={customerEditData.address || ''}
-                          onChange={handleCustomerEditChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Customer Type
-                        </label>
-                        <select
-                          name="customer_type"
-                          value={customerEditData.customer_type || ''}
-                          onChange={handleCustomerEditChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        >
-                          <option value="">Select Type</option>
-                          <option value="enterprise">Enterprise</option>
-                          <option value="mid-market">Mid-Market</option>
-                          <option value="smb">Small Business</option>
-                          <option value="startup">Startup</option>
-                          <option value="individual">Individual</option>
-                        </select>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Industry
-                        </label>
-                        <select
-                          name="industry"
-                          value={customerEditData.industry || ''}
-                          onChange={handleCustomerEditChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        >
-                          <option value="">Select Industry</option>
-                          <option value="technology">Technology</option>
-                          <option value="healthcare">Healthcare</option>
-                          <option value="finance">Finance</option>
-                          <option value="education">Education</option>
-                          <option value="retail">Retail</option>
-                          <option value="manufacturing">Manufacturing</option>
-                          <option value="entertainment">Entertainment</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-              
-              <div className="p-4 border-t border-gray-200 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCustomerEditModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                  disabled={customerEditLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
-                  disabled={customerEditLoading}
-                >
-                  {customerEditLoading && (
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  )}
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       ) : customer ? (
         <>
-          {/* Customer Info Card */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6 sm:mb-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-0">
-              <h2 className="text-lg sm:text-xl font-semibold">Customer Information</h2>
-              <button
-                onClick={() => {
-                  if (customer) resetCompanyForm(customer);
-                  setShowEditModal(true);
-                }}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-                Edit Company
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">Name</p>
-                <p className="text-base sm:text-lg break-words">{customer.name}</p>
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">Email</p>
-                <p className="text-base sm:text-lg break-words">
-                  {customer.email ? (
-                    <a href={`mailto:${customer.email}`} className="text-blue-600 hover:underline">
-                      {customer.email}
-                    </a>
-                  ) : (
-                    'N/A'
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">Phone</p>
-                <p className="text-base sm:text-lg">
-                  {customer.phone ? (
-                    <a href={`tel:${customer.phone}`} className="text-blue-600 hover:underline">
-                      {customer.phone}
-                    </a>
-                  ) : (
-                    'N/A'
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">Website</p>
-                <p className="text-base sm:text-lg break-words">
-                  {customer.website ? (
-                    <a 
-                      href={customer.website.startsWith('http') ? customer.website : `https://${customer.website}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      {customer.website.replace(/^https?:\/\//, '')}
-                    </a>
-                  ) : (
-                    'N/A'
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">Customer Type</p>
-                <p className="text-base sm:text-lg">
-                  <span className="px-2 py-0.5 sm:py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                    {customer.customer_type?.replace('_', ' ') || 'Not Specified'}
-                  </span>
-                </p>
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">Industry</p>
-                <p className="text-base sm:text-lg">{customer.industry || 'N/A'}</p>
-              </div>
-              {customer.address && (
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <p className="text-xs sm:text-sm text-gray-500">Address</p>
-                  <p className="text-base sm:text-lg break-words">{customer.address}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">Created</p>
-                <p className="text-base sm:text-lg">{formatDate(customer.created_at)}</p>
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">Last Updated</p>
-                <p className="text-base sm:text-lg">{formatDate(customer.updated_at)}</p>
-              </div>
-            </div>
-          </div>
+          {/* Customer Info Card Component */}
+          <CustomerInfoCard 
+            customer={customer} 
+            onEdit={() => {
+              if (customer) resetCompanyForm(customer);
+              setShowEditModal(true);
+            }}
+            formatDate={formatDate}
+          />
           
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="flex justify-between mb-4">
-              <h4 className="text-md font-medium mb-2">Organization IDs</h4>
-              <button
-                onClick={() => {
-                  resetOrgForm();
-                  setShowOrgForm(true);
-                }}
-                className="px-3 py-1 bg-green-100 text-green-600 rounded-md hover:bg-green-200 transition-colors"
-              >
-                Add Organization ID
-              </button>
-            </div>
-            
-            {orgsError && (
-              <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
-                <p>{orgsError}</p>
-              </div>
-            )}
-            
-            {/* Organization Form */}
-            {showOrgForm && (
-              <div className="p-4 border border-gray-200 rounded-md mb-4 bg-gray-50">
-                <h5 className="text-md font-medium mb-3">{editingOrg ? 'Edit Organization ID' : 'Add Organization ID'}</h5>
-                <form onSubmit={saveOrg} className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Organization ID *
-                      </label>
-                      <input
-                        type="text"
-                        name="org_id"
-                        value={orgFormData.org_id || ''}
-                        onChange={handleOrgFormChange}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Organization Name *
-                      </label>
-                      <input
-                        type="text"
-                        name="org_name"
-                        value={orgFormData.org_name || ''}
-                        onChange={handleOrgFormChange}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      onClick={resetOrgForm}
-                      className="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                    >
-                      {editingOrg ? 'Update' : 'Add'} Organization
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-            
-            {/* Organizations List */}
-            {orgsLoading ? (
-              <div className="p-4 text-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-                <p className="mt-1 text-sm text-gray-500">Loading organization data...</p>
-              </div>
-            ) : orgs.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">
-                <p>No organization IDs found for this customer.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Organization ID
-                      </th>
-                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Organization Name
-                      </th>
-                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Last Updated
-                      </th>
-                      <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {orgs.map((org) => (
-                      <tr key={org.org_id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{org.org_id}</div>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">{org.org_name}</div>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">{formatDate(org.updated_at)}</div>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleEditOrg(org)}
-                            className="text-blue-600 hover:text-blue-900 mr-3"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteOrg(org.org_id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          {/* Customer Profile Section */}
+          <CustomerProfileSection
+            customer={customer}
+            onSave={updateCustomerProfile}
+            formatDate={formatDate}
+          />
           
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <h4 className="text-md font-medium mb-2">Additional Information</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-500">Created:</span>
-                <span className="ml-2 font-medium">{formatDate(customer.created_at)}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Last Updated:</span>
-                <span className="ml-2 font-medium">{formatDate(customer.updated_at)}</span>
-              </div>
-            </div>
-          </div>
+          {/* Goals Section */}
+          <GoalsSection
+            goals={goals}
+            isLoading={goalsLoading}
+            error={goalsError}
+            onAddGoal={addGoal}
+            onUpdateGoal={updateGoal}
+            onDeleteGoal={deleteGoal}
+            formatDate={formatDate}
+          />
           
-          {/* Edit Company Modal */}
-          {showEditModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-semibold">Edit Company Details</h3>
-                  <button 
-                    onClick={() => setShowEditModal(false)}
-                    className="text-gray-500 hover:text-gray-700">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                
-                <form onSubmit={saveCompanyChanges} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Company Name *
-                      </label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={companyFormData.name || ''}
-                        onChange={handleCompanyFormChange}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={companyFormData.email || ''}
-                        onChange={handleCompanyFormChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Phone
-                      </label>
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={companyFormData.phone || ''}
-                        onChange={handleCompanyFormChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Website
-                      </label>
-                      <input
-                        type="url"
-                        name="website"
-                        value={companyFormData.website || ''}
-                        onChange={handleCompanyFormChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Customer Type
-                      </label>
-                      <select
-                        name="customer_type"
-                        value={companyFormData.customer_type || ''}
-                        onChange={handleCompanyFormChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="">Select Type</option>
-                        <option value="enterprise">Enterprise</option>
-                        <option value="mid-market">Mid-Market</option>
-                        <option value="smb">Small Business</option>
-                        <option value="startup">Startup</option>
-                        <option value="individual">Individual</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Industry
-                      </label>
-                      <select
-                        name="industry"
-                        value={companyFormData.industry || ''}
-                        onChange={handleCompanyFormChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="">Select Industry</option>
-                        <option value="technology">Technology</option>
-                        <option value="healthcare">Healthcare</option>
-                        <option value="finance">Finance</option>
-                        <option value="education">Education</option>
-                        <option value="retail">Retail</option>
-                        <option value="manufacturing">Manufacturing</option>
-                        <option value="entertainment">Entertainment</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Address
-                      </label>
-                      <textarea
-                        name="address"
-                        value={companyFormData.address || ''}
-                        onChange={handleCompanyFormChange}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-end space-x-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setShowEditModal(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={saveLoading}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
-                    >
-                      {saveLoading && (
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      )}
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
+          {/* Key Deliverables Section */}
+          <KeyDeliverablesSection
+            deliverables={deliverables}
+            isLoading={deliverablesLoading}
+            error={deliverablesError}
+            onAddDeliverable={addKeyDeliverable}
+            onUpdateDeliverable={updateKeyDeliverable}
+            onDeleteDeliverable={deleteKeyDeliverable}
+            formatDate={formatDate}
+          />
           
-          {/* Tabs for Conversations, Calls and Company Contacts */}
-          <Tabs defaultValue="contacts" className="w-full">
-            <TabsList className="mb-6">
-              <TabsTrigger value="contacts">Contacts ({contacts.length})</TabsTrigger>
-              <TabsTrigger value="conversations">Conversations ({conversations.length})</TabsTrigger>
-              <TabsTrigger value="calls">Calls ({calls.length})</TabsTrigger>
-            </TabsList>
-            
-            {/* Contacts Tab */}
-            <TabsContent value="contacts">
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Customer Contacts</h3>
-                  <button
-                    onClick={() => {
-                      resetContactForm();
-                      setShowContactForm(true);
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-                  >
-                    Add New Contact
-                  </button>
-                </div>
-                
-                {contactsError && (
-                  <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
-                    <p>{contactsError}</p>
-                  </div>
-                )}
-                
-                {/* Contact Form */}
-                {showContactForm && (
-                  <div className="p-6 border-b border-gray-200">
-                    <h4 className="text-md font-medium mb-4">{editingContact ? 'Edit Contact' : 'Add New Contact'}</h4>
-                    <form onSubmit={saveContact} className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Name *
-                          </label>
-                          <input
-                            type="text"
-                            name="name"
-                            value={contactFormData.name || ''}
-                            onChange={handleContactFormChange}
-                            required
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                        </div>
-                        
-                        {/* Company Selection Dropdown */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Company *
-                          </label>
-                          <select
-                            name="customer_id"
-                            value={contactFormData.customer_id || customerId}
-                            onChange={handleContactFormChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          >
-                            {availableCompanies.map(company => (
-                              <option key={company.id} value={company.id}>
-                                {company.name} {company.id === customerId ? '(Current)' : ''}
-                              </option>
-                            ))}
-                          </select>
-                          {contactFormData.customer_id !== customerId && editingContact && (
-                            <p className="mt-1 text-xs text-orange-600">
-                              Warning: Changing company will move this contact to another customer.
-                            </p>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Email
-                          </label>
-                          <input
-                            type="email"
-                            name="email"
-                            value={contactFormData.email || ''}
-                            onChange={handleContactFormChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Phone
-                          </label>
-                          <input
-                            type="tel"
-                            name="phone"
-                            value={contactFormData.phone || ''}
-                            onChange={handleContactFormChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Job Title
-                          </label>
-                          <input
-                            type="text"
-                            name="title"
-                            value={contactFormData.title || ''}
-                            onChange={handleContactFormChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="is_primary"
-                          name="is_primary"
-                          checked={contactFormData.is_primary || false}
-                          onChange={handleContactFormChange}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor="is_primary" className="ml-2 block text-sm text-gray-900">
-                          Primary Contact
-                        </label>
-                      </div>
-                      
-                      <div className="flex justify-end space-x-3">
-                        <button
-                          type="button"
-                          onClick={resetContactForm}
-                          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                          {editingContact ? 'Update' : 'Create'} Contact
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                )}
-                
-                {/* Contacts List */}
-                {contactsLoading ? (
-                  <div className="p-6 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-                    <p className="mt-2 text-gray-500">Loading contacts...</p>
-                  </div>
-                ) : contacts.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">
-                    <p>No contacts found for this customer.</p>
-                    <p className="mt-2">
-                      <button
-                        onClick={() => setShowContactForm(true)}
-                        className="text-blue-600 hover:underline"
-                      >
-                        Add your first contact
-                      </button>
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Name
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Contact Info
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Title
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {contacts.map((contact) => (
-                          <tr key={contact.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{contact.name}</div>
-                              <div className="text-xs text-gray-500">Added {formatDate(contact.created_at)}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-500">
-                                {contact.email && (
-                                  <div className="mb-1">
-                                    <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">
-                                      {contact.email}
-                                    </a>
-                                  </div>
-                                )}
-                                {contact.phone && (
-                                  <div>
-                                    <a href={`tel:${contact.phone}`} className="text-blue-600 hover:underline">
-                                      {contact.phone}
-                                    </a>
-                                  </div>
-                                )}
-                                {!contact.email && !contact.phone && <span className="text-gray-400">No contact info</span>}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-500">{contact.title || 'N/A'}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {contact.is_primary && (
-                                <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                  Primary Contact
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <button
-                                onClick={() => openCustomerEditModal(contact)}
-                                className="text-blue-600 hover:text-blue-900 mr-4"
-                              >
-                                Edit Customer
-                              </button>
-                              <button
-                                onClick={() => handleEditContact(contact)}
-                                className="text-blue-600 hover:text-blue-900 mr-4"
-                              >
-                                Edit Contact
-                              </button>
-                              <button
-                                onClick={() => handleDeleteContact(contact.id)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                Delete
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-            
-            {/* Conversations Tab */}
-            <TabsContent value="conversations">
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold">Conversations</h3>
-                </div>
-                
-                {conversations.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">
-                    No conversations found for this customer.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Title
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Platform
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Created
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Last Message
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {conversations.map((conversation) => (
-                          <tr key={conversation.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/conversations/${conversation.id}`)}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{conversation.title || 'Untitled'}</div>
-                              <div className="text-sm text-gray-500">{conversation.is_group ? 'Group' : 'Direct'}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                {conversation.platform_type}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                {conversation.status || 'active'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {formatDate(conversation.created_at)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {formatDate(conversation.last_message_at)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/conversations/${conversation.id}`);
-                                }}
-                                className="text-blue-600 hover:text-blue-900"
-                              >
-                                View
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-            
-            {/* Calls Tab */}
-            <TabsContent value="calls">
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold">Calls</h3>
-                </div>
-                
-                {calls.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">
-                    No calls found for this customer.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Call Name
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Duration
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Scheduled Time
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actual Time
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Participants
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {calls.map((call) => (
-                          <tr 
-                            key={call.id} 
-                            className="hover:bg-gray-50 cursor-pointer" 
-                            onClick={() => router.push(`/calls/${call.id}`)}>
-                            <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">{call.name || 'Untitled Call'}</div>
-                              {call.recording_url && (
-                                <div className="text-sm text-gray-500">
-                                  <a
-                                    href={call.recording_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:underline flex items-center"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                                    </svg>
-                                    Recording
-                                  </a>
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                {call.status || 'completed'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {formatDuration(call.duration)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {formatDate(call.scheduled_start_time)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {formatDate(call.actual_start_time)}
-                            </td>
-                            <td className="px-6 py-4">
-                              {participants[call.id] ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {participants[call.id].map((participant, index) => (
-                                    <span key={participant.id} className="px-2 py-1 text-xs rounded-full bg-gray-100">
-                                      {participant.name} ({participant.participant_type})
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-sm text-gray-500">No participants data</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
+          {/* Organization Section Component */}
+          <OrganizationSection 
+            orgs={orgs}
+            isLoading={orgsLoading}
+            error={orgsError}
+            showForm={showOrgForm}
+            formData={orgFormData}
+            editingOrg={editingOrg}
+            onShowForm={() => {
+              resetOrgForm();
+              setShowOrgForm(true);
+            }}
+            onFormChange={handleOrgFormChange}
+            onSave={saveOrg}
+            onEdit={handleEditOrg}
+            onDelete={handleDeleteOrg}
+            onCancel={resetOrgForm}
+            formatDate={formatDate}
+          />
+          
+          {/* Contacts Section Component */}
+          <ContactsSection 
+            contacts={contacts}
+            isLoading={contactsLoading}
+            error={contactsError}
+            showForm={showContactForm}
+            formData={contactFormData}
+            editingContact={editingContact}
+            availableCompanies={availableCompanies}
+            onShowForm={() => {
+              resetContactForm();
+              setShowContactForm(true);
+            }}
+            onFormChange={handleContactFormChange}
+            onSave={saveContact}
+            onEdit={handleEditContact}
+            onDelete={handleDeleteContact}
+            onCancel={resetContactForm}
+            formatDate={formatDate}
+          />
+          
+          {/* Communication Tabs Component */}
+          <CommunicationTabs 
+            conversations={conversations}
+            calls={calls}
+            participants={participants}
+            formatDate={formatDate}
+            formatDuration={formatDuration}
+          />
+          
+          {/* Edit Customer Modal Component */}
+          <EditCustomerModal 
+            isOpen={showEditModal}
+            onClose={() => setShowEditModal(false)}
+            formData={companyFormData}
+            onChange={handleCompanyFormChange}
+            onSubmit={saveCompanyChanges}
+            isLoading={saveLoading}
+          />
         </>
       ) : (
-        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">
-          <p>Customer not found. The customer may have been deleted or you may not have permission to view it.</p>
+        <div className="p-6 text-center">
+          <p className="text-xl text-gray-500">Customer not found</p>
+          <button
+            onClick={() => router.back()}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Go Back
+          </button>
         </div>
       )}
     </div>
