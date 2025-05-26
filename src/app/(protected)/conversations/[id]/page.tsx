@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { User, MessageSquare, Bot, ArrowLeft, RefreshCcw, Download, Loader2, Users, Link2, Unlink, Building, UserCheck } from 'lucide-react';
+import { User, MessageSquare, Bot, ArrowLeft, RefreshCcw, Download, Loader2, Users, Link2, Unlink, Building, UserCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -18,15 +18,18 @@ import { Input } from '@/components/ui/input';
 interface Message {
   id: string;
   conversation_id: string;
-  sender_id?: string;
-  sender_name?: string;
-  text?: string; // The actual message content is in text field
-  content?: string; // Keeping for backward compatibility
+  sender_id: string | null;
+  sender_name: string | null;
+  text: string | null;
+  content: string | null;
   created_at: string;
-  platform_timestamp?: string;
+  platform_timestamp: string | null;
   is_from_me: boolean;
-  metadata?: any;
-  sender_display_name?: string; // Added for displaying sender information
+  metadata: any;
+  sender_display_name?: string;
+  reply_to?: string | null;
+  reply_to_message?: Message | null;
+  temp?: boolean; // Flag for temporary messages that aren't stored in the database
 }
 
 interface ConversationDetails {
@@ -141,6 +144,11 @@ export default function ConversationDetailPage({ params }: PageProps) {
   const [importLoading, setImportLoading] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   
+  // Reply functionality state
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+  const [newMessageText, setNewMessageText] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  
   // Customer related state
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -179,8 +187,329 @@ export default function ConversationDetailPage({ params }: PageProps) {
       fetchConversationData();
     }
   }, [isLoaded, clerkUser, conversationId]);
+  
+  // Set up real-time subscription for messages using Supabase Postgres Changes
+  useEffect(() => {
+    if (!conversationId || !supabase) return;
+    
+    console.log('Setting up Supabase Realtime subscription for conversation:', conversationId);
+    
+    // Create a unique channel name that won't conflict
+    const channelName = `realtime-messages-${conversationId}-${Math.random().toString(36).substring(2, 11)}`;
+    console.log(`Creating channel: ${channelName}`);
+    
+    // First, ensure the messages table has the proper replication identity
+    const setupReplication = async () => {
+      try {
+        // This SQL sets the replication identity to FULL which is required for Realtime
+        await supabase.rpc('set_messages_replication', {
+          conversation_id_param: conversationId
+        }).then(response => {
+          console.log('Replication setup response:', response);
+        });
+      } catch (error) {
+        console.error('Error setting up replication:', error);
+      }
+    };
+    
+    setupReplication();
+    
+    // Create a channel specifically for this conversation's messages
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT', // Focus specifically on INSERT events for new messages
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          console.log('Realtime INSERT event received:', payload);
+          handleNewMessage(payload.new);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          console.log('Realtime UPDATE event received:', payload);
+          handleUpdatedMessage(payload.new);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          console.log('Realtime DELETE event received:', payload);
+          if (payload.old) {
+            handleDeletedMessage(payload.old);
+          }
+        }
+      );
+      
+    // Subscribe and handle connection status
+    channel.subscribe(status => {
+      console.log(`Subscription status for channel ${channelName}:`, status);
+      
+      if (status === 'SUBSCRIBED') {
+        console.log('Successfully subscribed to realtime messages!');
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('Channel error, will attempt to reconnect');
+        // We could implement reconnection logic here if needed
+      } else if (status === 'TIMED_OUT') {
+        console.error('Channel subscription timed out');
+      }
+    });
+    
+    // Also set up a polling fallback mechanism in case realtime fails
+    const pollingInterval = setInterval(() => {
+      console.log('Polling for new messages as a fallback mechanism');
+      fetchNewMessages();
+    }, 5000); // Poll every 5 seconds as a fallback
+    
+    // Function to fetch new messages via standard REST API
+    const fetchNewMessages = async () => {
+      if (!conversationId) return;
+      
+      // Only fetch messages newer than the newest one we have
+      const latestMessageTime = messages.length > 0 
+        ? Math.max(...messages.map(msg => new Date(msg.created_at).getTime()))
+        : 0;
+      
+      const latestTimeISO = new Date(latestMessageTime).toISOString();
+      
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .gt('created_at', latestTimeISO)
+          .order('created_at', { ascending: true });
+          
+        if (error) {
+          console.error('Error polling for messages:', error);
+          return;
+        }
+        
+        if (data && data.length > 0) {
+          console.log(`Polling found ${data.length} new messages`);
+          data.forEach(newMessage => {
+            handleNewMessage(newMessage);
+          });
+        }
+      } catch (error) {
+        console.error('Error in fetchNewMessages:', error);
+      }
+    };
+      
+    // Process new messages and add them to state
+    const handleNewMessage = (newMessage: any) => {
+      if (!newMessage || !newMessage.id) return;
+      
+      console.log('Processing new message:', newMessage);
+      
+      // Find sender information if available
+      const senderMember = conversation?.conversation_members?.find(
+        member => member.external_id === newMessage.sender_id
+      );
+      
+      // Determine if message is from current user
+      const isFromMe = newMessage.sender_id === null;
+      
+      // Find the replied-to message if this is a reply
+      let replyToMessage;
+      if (newMessage.reply_to) {
+        replyToMessage = messages.find(m => m.id === newMessage.reply_to);
+      }
+      
+      // Create the processed message object with all required properties
+      const processedMessage: Message = {
+        id: newMessage.id,
+        conversation_id: newMessage.conversation_id,
+        sender_id: newMessage.sender_id,
+        sender_name: newMessage.sender_name,
+        text: newMessage.text,
+        content: newMessage.content,
+        created_at: newMessage.created_at,
+        platform_timestamp: newMessage.platform_timestamp,
+        is_from_me: isFromMe,
+        metadata: newMessage.metadata,
+        sender_display_name: newMessage.sender_id || (senderMember?.name ?? '') || newMessage.sender_name || 'Unknown',
+        reply_to: newMessage.reply_to,
+        reply_to_message: replyToMessage
+      };
+      
+      // Update messages state, avoiding duplicates
+      setMessages(prevMessages => {
+        // Check for duplicates
+        if (prevMessages.some(msg => msg.id === newMessage.id)) {
+          console.log('Duplicate message detected, skipping:', newMessage.id);
+          return prevMessages;
+        }
+        
+        console.log('Adding new message to state:', newMessage.id);
+        
+        // Add new message and maintain sort order
+        const updatedMessages = [...prevMessages, processedMessage];
+        return sortMessagesByTimestamp(updatedMessages);
+      });
+    };
+    
+    // Handle updated messages
+    const handleUpdatedMessage = (updatedMessage: any) => {
+      if (!updatedMessage || !updatedMessage.id) return;
+      
+      console.log('Processing updated message:', updatedMessage.id);
+      
+      setMessages(prevMessages => {
+        // Find and update the existing message
+        const updatedMessages = prevMessages.map(msg => {
+          if (msg.id === updatedMessage.id) {
+            // Preserve current message properties but update with new data
+            return {
+              ...msg,
+              text: updatedMessage.text || msg.text,
+              content: updatedMessage.content || msg.content,
+              metadata: updatedMessage.metadata || msg.metadata,
+              // Add any other fields that might be updated
+            };
+          }
+          return msg;
+        });
+        
+        return updatedMessages;
+      });
+    };
+    
+    // Handle deleted messages
+    const handleDeletedMessage = (deletedMessage: any) => {
+      if (!deletedMessage || !deletedMessage.id) return;
+      
+      console.log('Processing deleted message:', deletedMessage.id);
+      
+      setMessages(prevMessages => 
+        prevMessages.filter(msg => msg.id !== deletedMessage.id)
+      );
+    };
+    
+    // Helper function to sort messages by timestamp
+    const sortMessagesByTimestamp = (messagesToSort: Message[]) => {
+      return [...messagesToSort].sort((a, b) => {
+        const timestampA = a.platform_timestamp || a.created_at;
+        const timestampB = b.platform_timestamp || b.created_at;
+        return new Date(timestampB).getTime() - new Date(timestampA).getTime();
+      });
+    };
+    
+    // Clean up subscription when component unmounts or dependencies change
+    return () => {
+      console.log(`Cleaning up Realtime subscription for channel ${channelName}`);
+      clearInterval(pollingInterval);
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, conversation, messages, supabase]);
 
-  const fetchConversationData = async () => {
+    // Handle sending a new message
+  const handleSendMessage = async () => {
+    if (!newMessageText.trim() || sendingMessage || !conversationId) return;
+    
+    setSendingMessage(true);
+    
+    try {
+      // Only send the message via webhook - no database storage
+      console.log('Sending message to webhook for conversation:', conversationId);
+      
+      // We need to get around CORS by setting up a proxy in the browser
+      // Making the request with mode: 'no-cors' allows us to send the request
+      // but we won't be able to read the response details
+      try {
+        // Create a detailed payload with properly formatted JSON
+        const webhookPayload = {
+          text: newMessageText.trim(),
+          conversation_id: conversationId,
+          reply_to: replyToMessage?.id || null,
+          timestamp: new Date().toISOString(),
+          message_id: `webhook-${Date.now()}`,
+          sender: {
+            id: 'current_user', // You can use actual user ID if available
+            name: 'You',
+            is_agent: true
+          },
+          metadata: {
+            client_generated: true,
+            platform: 'web',
+            user_agent: navigator.userAgent,
+            client_timestamp: Date.now()
+          }
+        };
+        
+        console.log('Sending webhook payload:', webhookPayload);
+        
+        // Send the webhook request with proper JSON format
+        // n8n should automatically parse this as JSON
+        const jsonData = {
+          text: webhookPayload.text,
+          conversation_id: webhookPayload.conversation_id,
+          message_id: webhookPayload.message_id,
+          timestamp: webhookPayload.timestamp,
+          reply_to: webhookPayload.reply_to,
+          metadata: webhookPayload.metadata,
+          sender: webhookPayload.sender
+        };
+        
+        // Most basic approach for sending JSON data
+        // This is the simplest, most reliable way to send JSON
+        await fetch('https://flytbasecs69.app.n8n.cloud/webhook/57e9905d-9cea-4ac0-a7e0-0a3f15b8e455', {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            text: webhookPayload.text,
+            conversation_id: webhookPayload.conversation_id
+          })
+        });
+        
+        console.log('Webhook request sent successfully (no response details available due to no-cors mode)');
+      } catch (error) {
+        // More detailed error logging
+        const webhookError = error as Error;
+        console.error('Error sending to webhook:', webhookError);
+        console.error('Error details:', {
+          message: webhookError.message || 'Unknown error',
+          name: webhookError.name || 'Error',
+          stack: webhookError.stack || 'No stack trace available',
+          timestamp: new Date().toISOString(),
+          conversation: conversationId,
+          originalText: newMessageText.trim().substring(0, 50) + (newMessageText.length > 50 ? '...' : '')
+        });
+      }
+      
+      // Clear the input and reply state
+      setNewMessageText('');
+      setReplyToMessage(null);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      // Could add a toast notification here for error feedback
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+const fetchConversationData = async () => {
     setLoading(true);
     setError('');
     
@@ -694,6 +1023,26 @@ export default function ConversationDetailPage({ params }: PageProps) {
               <CardTitle className="text-lg">Messages</CardTitle>
             </CardHeader>
             <CardContent className="flex-grow overflow-y-auto pb-6">
+              {/* Reply preview banner */}
+              {replyToMessage && (
+                <div className="sticky top-0 bg-blue-50 border-b border-blue-200 p-3 mb-3 rounded-md flex justify-between items-start">
+                  <div>
+                    <div className="text-xs text-blue-700 font-medium mb-1">
+                      Replying to {replyToMessage.sender_display_name || replyToMessage.sender_id || 'Unknown'}
+                    </div>
+                    <div className="text-sm text-blue-600 line-clamp-1">
+                      {replyToMessage.text || replyToMessage.content || 'Empty message'}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setReplyToMessage(null)}
+                    className="text-blue-500 hover:text-blue-700"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+              
               {messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-gray-500">
                   <p>No messages found in this conversation.</p>
@@ -720,30 +1069,60 @@ export default function ConversationDetailPage({ params }: PageProps) {
                         </div>
                       )}
                       <div
-                        className={`max-w-[80%] p-3 rounded-lg ${
+                        className={`max-w-[80%] rounded-lg ${
                           message.is_from_me
                             ? 'bg-blue-500 text-white rounded-tr-none'
                             : 'bg-gray-100 rounded-tl-none'
                         }`}
                       >
-                        {/* Show sender ID for group chats */}
-                        {!message.is_from_me && conversation?.is_group && (
-                          <div className="font-medium text-xs mb-1 text-gray-700">
-                            {message.sender_id || message.sender_display_name || 'Unknown'}
+                        {/* If this is a reply to another message, show the original message */}
+                        {message.reply_to && message.reply_to_message && (
+                          <div className={`px-3 pt-2 pb-1 border-l-2 mt-2 text-xs ${
+                            message.is_from_me ? 'border-blue-300 text-blue-100' : 'border-gray-300 text-gray-600'
+                          } rounded-sm mx-3 mt-2`}>
+                            <div className="font-medium mb-1">
+                              Replying to {message.reply_to_message.sender_display_name || message.reply_to_message.sender_id || 'Unknown'}
+                            </div>
+                            <div className="line-clamp-2">
+                              {message.reply_to_message.text || message.reply_to_message.content || 'Empty message'}
+                            </div>
                           </div>
                         )}
-                        {/* Display the message text */}
-                        <div className="whitespace-pre-wrap break-words">
-                          {message.text || message.content || 'Empty message'}
-                        </div>
-                        <div
-                          className={`text-xs mt-1 ${
-                            message.is_from_me ? 'text-blue-100' : 'text-gray-500'
-                          }`}
-                        >
-                          {message.platform_timestamp ? 
-                            new Date(message.platform_timestamp).toLocaleString() : 
-                            new Date(message.created_at).toLocaleString()}
+                        
+                        {/* Main message content */}
+                        <div className="p-3">
+                          {/* Show sender ID for group chats */}
+                          {!message.is_from_me && conversation?.is_group && (
+                            <div className="font-medium text-xs mb-1 text-gray-700">
+                              {message.sender_id || message.sender_display_name || 'Unknown'}
+                            </div>
+                          )}
+                          {/* Display the message text */}
+                          <div className="whitespace-pre-wrap break-words">
+                            {message.text || message.content || 'Empty message'}
+                          </div>
+                          <div className="flex justify-between items-center mt-1">
+                            <div
+                              className={`text-xs ${
+                                message.is_from_me ? 'text-blue-100' : 'text-gray-500'
+                              }`}
+                            >
+                              {message.platform_timestamp ? 
+                                new Date(message.platform_timestamp).toLocaleString() : 
+                                new Date(message.created_at).toLocaleString()}
+                            </div>
+                            {/* Reply button */}
+                            <button
+                              onClick={() => setReplyToMessage(message)}
+                              className={`ml-2 text-xs px-2 py-1 rounded ${
+                                message.is_from_me 
+                                  ? 'text-blue-100 hover:bg-blue-600' 
+                                  : 'text-gray-500 hover:bg-gray-200'
+                              }`}
+                            >
+                              Reply
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -751,6 +1130,37 @@ export default function ConversationDetailPage({ params }: PageProps) {
                 </div>
               )}
             </CardContent>
+            
+            {/* Message input area */}
+            <div className="border-t p-3">
+              <div className="flex items-end gap-2">
+                <div className="flex-grow">
+                  <Input
+                    placeholder="Type a message..."
+                    value={newMessageText}
+                    onChange={(e) => setNewMessageText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    className="resize-none border rounded-md p-2 w-full"
+                  />
+                </div>
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!newMessageText.trim() || sendingMessage}
+                  size="sm"
+                >
+                  {sendingMessage ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Send'
+                  )}
+                </Button>
+              </div>
+            </div>
           </Card>
         </div>
 
