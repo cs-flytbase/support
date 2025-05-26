@@ -18,6 +18,14 @@ interface CustomerDetails {
   updated_at: string;
 }
 
+interface OrgDetails {
+  org_id: string;
+  org_name: string;
+  customer_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface CustomerContact {
   id: string;
   customer_id: string;
@@ -81,6 +89,18 @@ export default function CustomerDetailPage() {
   const [participants, setParticipants] = useState<Record<string, Participant[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [contactsError, setContactsError] = useState<string | null>(null);
+  
+  // Organization state
+  const [orgs, setOrgs] = useState<OrgDetails[]>([]);
+  const [orgsLoading, setOrgsLoading] = useState(true);
+  const [orgsError, setOrgsError] = useState<string | null>(null);
+  const [showOrgForm, setShowOrgForm] = useState(false);
+  const [editingOrg, setEditingOrg] = useState<OrgDetails | null>(null);
+  const [orgFormData, setOrgFormData] = useState<Partial<OrgDetails>>({
+    org_id: '',
+    org_name: '',
+    customer_id: ''
+  });
   
   // Company edit state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -229,6 +249,9 @@ export default function CustomerDetailPage() {
       
       setCustomer(customerData);
       resetCompanyForm(customerData);
+
+      // Load organization data
+      await loadOrganizationData();
       
       // Fetch customer conversations
       const { data: conversationData, error: conversationError } = await supabase
@@ -557,6 +580,160 @@ export default function CustomerDetailPage() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  // Load organization data
+  const loadOrganizationData = async () => {
+    setOrgsLoading(true);
+    setOrgsError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('org')
+        .select('*')
+        .eq('customer_id', customerId);
+      
+      if (error) throw error;
+      setOrgs(data || []);
+    } catch (err: any) {
+      console.error('Error loading organization data:', err);
+      setOrgsError(err.message || 'Failed to load organization data');
+    } finally {
+      setOrgsLoading(false);
+    }
+  };
+
+  // Handle org form input change
+  const handleOrgFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setOrgFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Reset org form
+  const resetOrgForm = () => {
+    setOrgFormData({
+      org_id: '',
+      org_name: '',
+      customer_id: customerId
+    });
+    setEditingOrg(null);
+    setShowOrgForm(false);
+  };
+
+  // Create or update organization
+  const saveOrg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!orgFormData.org_id || !orgFormData.org_name) {
+      alert('Organization ID and name are required');
+      return;
+    }
+    
+    try {
+      // First check if the org_id already exists (for new orgs)
+      if (!editingOrg) {
+        const { data: existingOrg, error: checkError } = await supabase
+          .from('org')
+          .select('org_id')
+          .eq('org_id', orgFormData.org_id)
+          .maybeSingle();
+
+        if (checkError) throw checkError;
+        
+        // If org_id already exists, show a specific error message
+        if (existingOrg) {
+          setOrgsError(`Organization ID '${orgFormData.org_id}' already exists. Please use a different ID.`);
+          return;
+        }
+      }
+      
+      if (editingOrg) {
+        // Check if we're changing the org_id and if so, ensure it doesn't conflict
+        if (editingOrg.org_id !== orgFormData.org_id) {
+          const { data: existingOrg, error: checkError } = await supabase
+            .from('org')
+            .select('org_id')
+            .eq('org_id', orgFormData.org_id)
+            .maybeSingle();
+  
+          if (checkError) throw checkError;
+          
+          // If org_id already exists, show a specific error message
+          if (existingOrg) {
+            setOrgsError(`Organization ID '${orgFormData.org_id}' already exists. Please use a different ID.`);
+            return;
+          }
+        }
+        
+        // Update existing organization
+        const { error } = await supabase
+          .from('org')
+          .update({
+            org_id: orgFormData.org_id,
+            org_name: orgFormData.org_name,
+            updated_at: new Date().toISOString()
+          })
+          .eq('org_id', editingOrg.org_id);
+          
+        if (error) throw error;
+      } else {
+        // Create new organization
+        const { error } = await supabase
+          .from('org')
+          .insert({
+            org_id: orgFormData.org_id,
+            org_name: orgFormData.org_name,
+            customer_id: customerId
+          });
+          
+        if (error) throw error;
+      }
+      
+      // Reload orgs list
+      await loadOrganizationData();
+      resetOrgForm();
+      setOrgsError(null); // Clear any previous errors on success
+    } catch (err: any) {
+      console.error('Error saving organization:', err);
+      if (err.code === '23505' || err.message?.includes('duplicate key')) {
+        setOrgsError(`Organization ID '${orgFormData.org_id}' already exists. Please use a different ID.`);
+      } else {
+        setOrgsError(err.message || 'Failed to save organization');
+      }
+    }
+  };
+
+  // Edit organization
+  const handleEditOrg = (org: OrgDetails) => {
+    setEditingOrg(org);
+    setOrgFormData({
+      org_id: org.org_id,
+      org_name: org.org_name,
+      customer_id: org.customer_id
+    });
+    setShowOrgForm(true);
+  };
+
+  // Delete organization
+  const handleDeleteOrg = async (orgId: string) => {
+    if (!confirm('Are you sure you want to delete this organization ID?')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('org')
+        .delete()
+        .eq('org_id', orgId);
+        
+      if (error) throw error;
+      
+      // Reload orgs
+      await loadOrganizationData();
+    } catch (err: any) {
+      console.error('Error deleting organization:', err);
+      setOrgsError(err.message || 'Failed to delete organization');
+    }
+  };
+
   return (
     <div className="container mx-auto p-6">
       {/* Header with back button */}
@@ -833,6 +1010,157 @@ export default function CustomerDetailPage() {
               <div>
                 <p className="text-xs sm:text-sm text-gray-500">Last Updated</p>
                 <p className="text-base sm:text-lg">{formatDate(customer.updated_at)}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="flex justify-between mb-4">
+              <h4 className="text-md font-medium mb-2">Organization IDs</h4>
+              <button
+                onClick={() => {
+                  resetOrgForm();
+                  setShowOrgForm(true);
+                }}
+                className="px-3 py-1 bg-green-100 text-green-600 rounded-md hover:bg-green-200 transition-colors"
+              >
+                Add Organization ID
+              </button>
+            </div>
+            
+            {orgsError && (
+              <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+                <p>{orgsError}</p>
+              </div>
+            )}
+            
+            {/* Organization Form */}
+            {showOrgForm && (
+              <div className="p-4 border border-gray-200 rounded-md mb-4 bg-gray-50">
+                <h5 className="text-md font-medium mb-3">{editingOrg ? 'Edit Organization ID' : 'Add Organization ID'}</h5>
+                <form onSubmit={saveOrg} className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Organization ID *
+                      </label>
+                      <input
+                        type="text"
+                        name="org_id"
+                        value={orgFormData.org_id || ''}
+                        onChange={handleOrgFormChange}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Organization Name *
+                      </label>
+                      <input
+                        type="text"
+                        name="org_name"
+                        value={orgFormData.org_name || ''}
+                        onChange={handleOrgFormChange}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      type="button"
+                      onClick={resetOrgForm}
+                      className="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      {editingOrg ? 'Update' : 'Add'} Organization
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+            
+            {/* Organizations List */}
+            {orgsLoading ? (
+              <div className="p-4 text-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+                <p className="mt-1 text-sm text-gray-500">Loading organization data...</p>
+              </div>
+            ) : orgs.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                <p>No organization IDs found for this customer.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Organization ID
+                      </th>
+                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Organization Name
+                      </th>
+                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Last Updated
+                      </th>
+                      <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {orgs.map((org) => (
+                      <tr key={org.org_id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{org.org_id}</div>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">{org.org_name}</div>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">{formatDate(org.updated_at)}</div>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => handleEditOrg(org)}
+                            className="text-blue-600 hover:text-blue-900 mr-3"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteOrg(org.org_id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <h4 className="text-md font-medium mb-2">Additional Information</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-500">Created:</span>
+                <span className="ml-2 font-medium">{formatDate(customer.created_at)}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Last Updated:</span>
+                <span className="ml-2 font-medium">{formatDate(customer.updated_at)}</span>
               </div>
             </div>
           </div>

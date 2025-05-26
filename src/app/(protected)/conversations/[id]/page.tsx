@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useUser } from '@clerk/nextjs';
@@ -144,6 +144,9 @@ export default function ConversationDetailPage({ params }: PageProps) {
   const [importLoading, setImportLoading] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   
+  // Reference to the messages container for auto-scrolling
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
   // Reply functionality state
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [newMessageText, setNewMessageText] = useState('');
@@ -187,6 +190,10 @@ export default function ConversationDetailPage({ params }: PageProps) {
       fetchConversationData();
     }
   }, [isLoaded, clerkUser, conversationId]);
+  
+  // We're no longer using programmatic scrolling - the flex-col-reverse approach automatically
+  // puts the latest messages at the bottom visually while keeping them at the top of the scroll area
+  // This is a more reliable approach than trying to calculate and maintain scroll positions
   
   // Set up real-time subscription for messages using Supabase Postgres Changes
   useEffect(() => {
@@ -575,6 +582,8 @@ const fetchConversationData = async () => {
       });
       
       setMessages(sortedMessages);
+      
+      // We no longer need to manually scroll - the flex layout handles this automatically
       
       // Fetch available AI agents
       const { data: agentsData, error: agentError } = await supabase
@@ -1022,10 +1031,10 @@ const fetchConversationData = async () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Messages</CardTitle>
             </CardHeader>
-            <CardContent className="flex-grow overflow-y-auto pb-6">
+            <CardContent className="flex-grow flex flex-col overflow-hidden pb-0">
               {/* Reply preview banner */}
               {replyToMessage && (
-                <div className="sticky top-0 bg-blue-50 border-b border-blue-200 p-3 mb-3 rounded-md flex justify-between items-start">
+                <div className="sticky top-0 z-10 bg-blue-50 border-b border-blue-200 p-3 mb-3 rounded-md flex justify-between items-start">
                   <div>
                     <div className="text-xs text-blue-700 font-medium mb-1">
                       Replying to {replyToMessage.sender_display_name || replyToMessage.sender_id || 'Unknown'}
@@ -1048,8 +1057,13 @@ const fetchConversationData = async () => {
                   <p>No messages found in this conversation.</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {[...messages].reverse().map((message) => (
+                <div 
+                  ref={messagesContainerRef} 
+                  className="flex-grow overflow-y-auto pb-6 flex flex-col-reverse"
+                  style={{ display: 'flex', flexDirection: 'column-reverse' }}
+                >
+                  <div className="flex flex-col-reverse space-y-reverse space-y-4">
+                    {[...messages].map((message) => (
                     <div
                       key={message.id}
                       className={`flex ${
@@ -1127,6 +1141,7 @@ const fetchConversationData = async () => {
                       </div>
                     </div>
                   ))}
+                  </div>
                 </div>
               )}
             </CardContent>
