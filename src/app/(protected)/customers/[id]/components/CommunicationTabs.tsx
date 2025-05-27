@@ -1,4 +1,5 @@
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,12 @@ export const CommunicationTabs: React.FC<CommunicationTabsProps> = ({
   formatDate,
   formatDuration
 }) => {
+  const router = useRouter();
+  
+  // Function to navigate to call details page
+  const navigateToCallDetails = (callId: string) => {
+    router.push(`/calls/${callId}`);
+  };
   return (
     <Card className="mt-8 shadow-md">
       <div className="bg-gradient-to-r from-gray-50 to-slate-50 px-6 py-4 border-b border-gray-200">
@@ -164,9 +171,13 @@ export const CommunicationTabs: React.FC<CommunicationTabsProps> = ({
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {calls.map((call) => (
-                    <tr key={call.id} className="hover:bg-slate-50 transition-colors">
+                    <tr 
+                      key={call.id} 
+                      className="hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => navigateToCallDetails(call.id)}
+                    >
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-medium text-slate-900">{call.name}</div>
+                        <div className="text-sm font-medium text-slate-900 text-blue-600 hover:underline">{call.name}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <Badge className={
