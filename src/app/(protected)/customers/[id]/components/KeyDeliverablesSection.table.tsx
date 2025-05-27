@@ -298,7 +298,7 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
             </div>
           )}
           
-          {/* Deliverables List */}
+          {/* Deliverables Table */}
           {isLoading ? (
             <div className="py-10 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
@@ -315,156 +315,165 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              {deliverables.map((deliverable) => (
-                <div key={deliverable.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                  {editingDeliverableId === deliverable.id ? (
-                    <div className="p-4 border-l-4 border-blue-400">
-                      <form onSubmit={handleUpdateDeliverable} className="space-y-3">
-                        <textarea
-                          value={editingDeliverableText}
-                          onChange={(e) => setEditingDeliverableText(e.target.value)}
-                          required
-                          rows={3}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        />
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Priority
-                            </label>
-                            <select
-                              value={editingDeliverablePriority}
-                              onChange={(e) => setEditingDeliverablePriority(e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            >
-                              <option value="high">High</option>
-                              <option value="medium">Medium</option>
-                              <option value="low">Low</option>
-                            </select>
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Status
-                            </label>
-                            <select
-                              value={editingDeliverableStatus}
-                              onChange={(e) => setEditingDeliverableStatus(e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            >
-                              <option value="not_started">Not Started</option>
-                              <option value="in_progress">In Progress</option>
-                              <option value="completed">Completed</option>
-                            </select>
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Assigned Agent (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            value={editingDeliverableAgentName}
-                            onChange={(e) => setEditingDeliverableAgentName(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            placeholder="Enter agent name..."
-                          />
-                        </div>
-                        
-                        <div className="flex justify-end space-x-3">
-                          <button
-                            type="button"
-                            onClick={cancelEditing}
-                            className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
-                            disabled={isSubmitting}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 text-sm"
-                            disabled={isSubmitting}
-                          >
-                            {isSubmitting && (
-                              <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                            )}
-                            Save Changes
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  ) : (
-                    <div className={`p-4 ${!deliverable.is_editable ? 'bg-gray-50 border-l-4 border-gray-300' : 
-                      deliverable.priority === 'high' ? 'border-l-4 border-red-400' : 
-                      deliverable.priority === 'medium' ? 'border-l-4 border-yellow-400' : 
-                      'border-l-4 border-green-400'}`}>
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 mr-4">
-                          <div className="flex items-center flex-wrap gap-2 mb-2">
-                            {/* Priority Badge */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deliverable</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Editable</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {deliverables.map((deliverable) => (
+                    <tr key={deliverable.id} className="hover:bg-gray-50">
+                      {editingDeliverableId === deliverable.id ? (
+                        <td colSpan={7} className="px-6 py-4">
+                          <form onSubmit={handleUpdateDeliverable} className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Deliverable Description</label>
+                              <textarea
+                                value={editingDeliverableText}
+                                onChange={(e) => setEditingDeliverableText(e.target.value)}
+                                required
+                                rows={2}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                                <select
+                                  value={editingDeliverablePriority}
+                                  onChange={(e) => setEditingDeliverablePriority(e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                >
+                                  <option value="high">High</option>
+                                  <option value="medium">Medium</option>
+                                  <option value="low">Low</option>
+                                </select>
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                <select
+                                  value={editingDeliverableStatus}
+                                  onChange={(e) => setEditingDeliverableStatus(e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                >
+                                  <option value="not_started">Not Started</option>
+                                  <option value="in_progress">In Progress</option>
+                                  <option value="completed">Completed</option>
+                                </select>
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Agent</label>
+                                <input
+                                  type="text"
+                                  value={editingDeliverableAgentName}
+                                  onChange={(e) => setEditingDeliverableAgentName(e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                  placeholder="Enter agent name..."
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="flex justify-end space-x-3">
+                              <button
+                                type="button"
+                                onClick={cancelEditing}
+                                className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
+                                disabled={isSubmitting}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 text-sm"
+                                disabled={isSubmitting}
+                              >
+                                {isSubmitting && (
+                                  <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                )}
+                                Save Changes
+                              </button>
+                            </div>
+                          </form>
+                        </td>
+                      ) : (
+                        <>
+                          <td className="px-6 py-4 whitespace-normal">
+                            <div className="text-sm text-gray-900">{deliverable.deliverable_text}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadgeClasses(deliverable.priority)}`}>
                               {getPriorityDisplayText(deliverable.priority)}
                             </span>
-                            
-                            {/* Status Badge */}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClasses(deliverable.status)}`}>
                               {getStatusDisplayText(deliverable.status)}
                             </span>
-                            
-                            {/* Editable Badge */}
-                            {!deliverable.is_editable && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                Non-editable
-                              </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {deliverable.assigned_agent_name ? (
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                  <span className="text-xs font-medium text-indigo-800">
+                                    {deliverable.assigned_agent_name.substring(0, 2).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div className="ml-2">
+                                  <div className="text-sm text-gray-900">{deliverable.assigned_agent_name}</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">Unassigned</span>
                             )}
-                            
-                            {/* Agent Badge */}
-                            {deliverable.assigned_agent_name && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                </svg>
-                                {deliverable.assigned_agent_name}
-                              </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {deliverable.is_editable ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Yes</span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">No</span>
                             )}
-                          </div>
-                          <p className="text-gray-700 whitespace-pre-wrap">{deliverable.deliverable_text}</p>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Last updated: {formatDate(deliverable.updated_at)}
-                          </p>
-                        </div>
-                        
-                        {deliverable.is_editable && (
-                          <div className="flex flex-shrink-0 space-x-2">
-                            <button
-                              onClick={() => startEditingDeliverable(deliverable)}
-                              className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => onDeleteDeliverable(deliverable.id)}
-                              className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(deliverable.updated_at)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            {deliverable.is_editable && (
+                              <>
+                                <button
+                                  onClick={() => startEditingDeliverable(deliverable)}
+                                  className="text-blue-600 hover:text-blue-900 mr-3"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => onDeleteDeliverable(deliverable.id)}
+                                  className="text-red-600 hover:text-red-900"
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

@@ -157,7 +157,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="bg-gradient-to-r from-blue-50 to-cyan-50 px-6 py-4 border-b border-gray-200">
           <div className="flex justify-between items-center">
-            <h4 className="text-lg font-semibold text-gray-800">Customer Goals</h4>
+            <h4 className="text-lg font-semibold text-gray-800">Goals</h4>
             <button
               onClick={() => setShowAddForm(true)}
               className="px-4 py-2 bg-white text-blue-600 rounded-md hover:bg-gray-50 border border-blue-200 transition-colors flex items-center gap-2 text-sm font-medium shadow-sm"
@@ -277,7 +277,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
             </div>
           )}
           
-          {/* Goals List */}
+          {/* Goals Table */}
           {isLoading ? (
             <div className="py-10 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
@@ -290,150 +290,157 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
                 <p className="text-gray-500 font-medium">No goals defined for this customer</p>
-                <p className="text-gray-500 text-sm mt-1">Add goals to track what needs to be achieved for this customer</p>
+                <p className="text-gray-500 text-sm mt-1">Add goals to track what you want to achieve with this customer</p>
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              {goals.map((goal) => (
-                <div key={goal.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                  {editingGoalId === goal.id ? (
-                    <div className="p-4 border-l-4 border-blue-400">
-                      <form onSubmit={handleUpdateGoal} className="space-y-3">
-                        <textarea
-                          value={editingGoalText}
-                          onChange={(e) => setEditingGoalText(e.target.value)}
-                          required
-                          rows={3}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        />
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Priority
-                            </label>
-                            <select
-                              value={editingGoalPriority}
-                              onChange={(e) => setEditingGoalPriority(e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            >
-                              <option value="high">High</option>
-                              <option value="medium">Medium</option>
-                              <option value="low">Low</option>
-                            </select>
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Status
-                            </label>
-                            <select
-                              value={editingGoalStatus}
-                              onChange={(e) => setEditingGoalStatus(e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            >
-                              <option value="not_started">Not Started</option>
-                              <option value="in_progress">In Progress</option>
-                              <option value="completed">Completed</option>
-                            </select>
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Assigned Agent (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            value={editingGoalAgentName}
-                            onChange={(e) => setEditingGoalAgentName(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            placeholder="Enter agent name..."
-                          />
-                        </div>
-                        
-                        <div className="flex justify-end space-x-3">
-                          <button
-                            type="button"
-                            onClick={cancelEditing}
-                            className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
-                            disabled={isSubmitting}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 text-sm"
-                            disabled={isSubmitting}
-                          >
-                            {isSubmitting && (
-                              <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                            )}
-                            Save Changes
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  ) : (
-                    <div className={`p-4 ${goal.priority === 'high' ? 'border-l-4 border-red-400' : 
-                      goal.priority === 'medium' ? 'border-l-4 border-yellow-400' : 
-                      'border-l-4 border-green-400'}`}>
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 mr-4">
-                          <div className="flex items-center flex-wrap gap-2 mb-2">
-                            {/* Priority Badge */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Goal</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {goals.map((goal) => (
+                    <tr key={goal.id} className="hover:bg-gray-50">
+                      {editingGoalId === goal.id ? (
+                        <td colSpan={6} className="px-6 py-4">
+                          <form onSubmit={handleUpdateGoal} className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Goal Description</label>
+                              <textarea
+                                value={editingGoalText}
+                                onChange={(e) => setEditingGoalText(e.target.value)}
+                                required
+                                rows={2}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                                <select
+                                  value={editingGoalPriority}
+                                  onChange={(e) => setEditingGoalPriority(e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                >
+                                  <option value="high">High</option>
+                                  <option value="medium">Medium</option>
+                                  <option value="low">Low</option>
+                                </select>
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                <select
+                                  value={editingGoalStatus}
+                                  onChange={(e) => setEditingGoalStatus(e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                >
+                                  <option value="not_started">Not Started</option>
+                                  <option value="in_progress">In Progress</option>
+                                  <option value="completed">Completed</option>
+                                </select>
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Agent</label>
+                                <input
+                                  type="text"
+                                  value={editingGoalAgentName}
+                                  onChange={(e) => setEditingGoalAgentName(e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                  placeholder="Enter agent name..."
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="flex justify-end space-x-3">
+                              <button
+                                type="button"
+                                onClick={cancelEditing}
+                                className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
+                                disabled={isSubmitting}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 text-sm"
+                                disabled={isSubmitting}
+                              >
+                                {isSubmitting && (
+                                  <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                )}
+                                Save Changes
+                              </button>
+                            </div>
+                          </form>
+                        </td>
+                      ) : (
+                        <>
+                          <td className="px-6 py-4 whitespace-normal">
+                            <div className="text-sm text-gray-900">{goal.goal_text}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadgeClasses(goal.priority)}`}>
                               {getPriorityDisplayText(goal.priority)}
                             </span>
-                            
-                            {/* Status Badge */}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClasses(goal.status)}`}>
                               {getStatusDisplayText(goal.status)}
                             </span>
-                            
-                            {/* Agent Badge */}
-                            {goal.assigned_agent_name && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                </svg>
-                                {goal.assigned_agent_name}
-                              </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {goal.assigned_agent_name ? (
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                  <span className="text-xs font-medium text-indigo-800">
+                                    {goal.assigned_agent_name.substring(0, 2).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div className="ml-2">
+                                  <div className="text-sm text-gray-900">{goal.assigned_agent_name}</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">Unassigned</span>
                             )}
-                          </div>
-                          <p className="text-gray-700 whitespace-pre-wrap">{goal.goal_text}</p>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Last updated: {formatDate(goal.updated_at)}
-                          </p>
-                        </div>
-                        
-                        <div className="flex flex-shrink-0 space-x-2">
-                          <button
-                            onClick={() => startEditingGoal(goal)}
-                            className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => onDeleteGoal(goal.id)}
-                            className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(goal.updated_at)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                              onClick={() => startEditingGoal(goal)}
+                              className="text-blue-600 hover:text-blue-900 mr-3"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => onDeleteGoal(goal.id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

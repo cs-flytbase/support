@@ -11,8 +11,8 @@ import { OrganizationSection } from "./components/OrganizationSection";
 import { ContactsSection } from "./components/ContactsSection";
 import { CommunicationTabs } from "./components/CommunicationTabs";
 import { CustomerProfileSection } from "./components/CustomerProfileSection";
-import { GoalsSection } from "./components/GoalsSection";
-import { KeyDeliverablesSection } from "./components/KeyDeliverablesSection";
+import { GoalsSection } from './components/GoalsSection.table';
+import { KeyDeliverablesSection } from './components/KeyDeliverablesSection.table';
 
 // Import types
 import { 
@@ -545,13 +545,16 @@ export default function CustomerDetailPage() {
   };
   
   // Add a new goal
-  const addGoal = async (goalText: string) => {
+  const addGoal = async (goalText: string, priority: string, status: string, agentName?: string) => {
     try {
       const { data, error } = await supabase
         .from('goals')
         .insert([{
           customer_id: customerId,
-          goal_text: goalText
+          goal_text: goalText,
+          priority: priority,
+          status: status,
+          assigned_agent_name: agentName || null
         }])
         .select();
         
@@ -569,14 +572,29 @@ export default function CustomerDetailPage() {
   };
   
   // Update an existing goal
-  const updateGoal = async (goalId: string, goalText: string) => {
+  const updateGoal = async (goalId: string, goalText: string, priority?: string, status?: string, agentName?: string) => {
     try {
+      const updateData: any = {
+        goal_text: goalText,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add optional fields if provided
+      if (priority !== undefined) {
+        updateData.priority = priority;
+      }
+      
+      if (status !== undefined) {
+        updateData.status = status;
+      }
+      
+      if (agentName !== undefined) {
+        updateData.assigned_agent_name = agentName || null;
+      }
+      
       const { error } = await supabase
         .from('goals')
-        .update({
-          goal_text: goalText,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', goalId);
         
       if (error) throw error;
@@ -584,7 +602,14 @@ export default function CustomerDetailPage() {
       // Update local state
       setGoals(prevGoals => prevGoals.map(goal => 
         goal.id === goalId 
-          ? { ...goal, goal_text: goalText, updated_at: new Date().toISOString() }
+          ? { 
+              ...goal, 
+              goal_text: goalText, 
+              priority: priority !== undefined ? priority : goal.priority,
+              status: status !== undefined ? status : goal.status,
+              assigned_agent_name: agentName !== undefined ? agentName : goal.assigned_agent_name,
+              updated_at: new Date().toISOString() 
+            }
           : goal
       ));
     } catch (err: any) {
@@ -617,7 +642,7 @@ export default function CustomerDetailPage() {
   };
   
   // Add a new key deliverable
-  const addKeyDeliverable = async (deliverableText: string, isEditable: boolean, priority: string, status: string) => {
+  const addKeyDeliverable = async (deliverableText: string, isEditable: boolean, priority: string, status: string, agentName?: string) => {
     try {
       const { data, error } = await supabase
         .from('key_deliverables')
@@ -626,7 +651,8 @@ export default function CustomerDetailPage() {
           deliverable_text: deliverableText,
           is_editable: isEditable,
           priority: priority,
-          status: status
+          status: status,
+          assigned_agent_name: agentName || null
         }])
         .select();
         
@@ -644,7 +670,7 @@ export default function CustomerDetailPage() {
   };
   
   // Update an existing deliverable
-  const updateKeyDeliverable = async (deliverableId: string, deliverableText: string, priority?: string, status?: string) => {
+  const updateKeyDeliverable = async (deliverableId: string, deliverableText: string, priority?: string, status?: string, agentName?: string) => {
     try {
       const updateData: any = {
         deliverable_text: deliverableText,
@@ -658,6 +684,11 @@ export default function CustomerDetailPage() {
       
       if (status !== undefined) {
         updateData.status = status;
+      }
+      
+      // Add agent name if provided
+      if (agentName !== undefined) {
+        updateData.assigned_agent_name = agentName || null;
       }
       
       const { error } = await supabase
@@ -675,6 +706,7 @@ export default function CustomerDetailPage() {
               deliverable_text: deliverableText, 
               priority: priority !== undefined ? priority : deliverable.priority,
               status: status !== undefined ? status : deliverable.status,
+              assigned_agent_name: agentName !== undefined ? agentName : deliverable.assigned_agent_name,
               updated_at: new Date().toISOString() 
             }
           : deliverable

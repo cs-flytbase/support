@@ -73,6 +73,10 @@ export interface CustomerGoal {
   id: string;
   customer_id: string;
   goal_text: string;
+  priority: string; // 'high', 'medium', 'low'
+  status: string; // 'not_started', 'in_progress', 'completed'
+  assigned_agent_id: string | null;
+  assigned_agent_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -84,6 +88,8 @@ export interface KeyDeliverable {
   is_editable: boolean;
   priority: string; // 'high', 'medium', 'low'
   status: string; // 'not_started', 'in_progress', 'completed'
+  assigned_agent_id: string | null;
+  assigned_agent_name: string | null;
   created_at: string;
   updated_at: string;
 }
