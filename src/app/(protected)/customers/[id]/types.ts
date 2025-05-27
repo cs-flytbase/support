@@ -82,6 +82,8 @@ export interface KeyDeliverable {
   customer_id: string;
   deliverable_text: string;
   is_editable: boolean;
+  priority: string; // 'high', 'medium', 'low'
+  status: string; // 'not_started', 'in_progress', 'completed'
   created_at: string;
   updated_at: string;
 }

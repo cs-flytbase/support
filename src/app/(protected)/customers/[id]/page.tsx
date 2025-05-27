@@ -617,14 +617,16 @@ export default function CustomerDetailPage() {
   };
   
   // Add a new key deliverable
-  const addKeyDeliverable = async (deliverableText: string, isEditable: boolean) => {
+  const addKeyDeliverable = async (deliverableText: string, isEditable: boolean, priority: string, status: string) => {
     try {
       const { data, error } = await supabase
         .from('key_deliverables')
         .insert([{
           customer_id: customerId,
           deliverable_text: deliverableText,
-          is_editable: isEditable
+          is_editable: isEditable,
+          priority: priority,
+          status: status
         }])
         .select();
         
@@ -642,14 +644,25 @@ export default function CustomerDetailPage() {
   };
   
   // Update an existing deliverable
-  const updateKeyDeliverable = async (deliverableId: string, deliverableText: string) => {
+  const updateKeyDeliverable = async (deliverableId: string, deliverableText: string, priority?: string, status?: string) => {
     try {
+      const updateData: any = {
+        deliverable_text: deliverableText,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add priority and status to update data if provided
+      if (priority !== undefined) {
+        updateData.priority = priority;
+      }
+      
+      if (status !== undefined) {
+        updateData.status = status;
+      }
+      
       const { error } = await supabase
         .from('key_deliverables')
-        .update({
-          deliverable_text: deliverableText,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', deliverableId);
         
       if (error) throw error;
@@ -657,7 +670,13 @@ export default function CustomerDetailPage() {
       // Update local state
       setDeliverables(prevDeliverables => prevDeliverables.map(deliverable => 
         deliverable.id === deliverableId 
-          ? { ...deliverable, deliverable_text: deliverableText, updated_at: new Date().toISOString() }
+          ? { 
+              ...deliverable, 
+              deliverable_text: deliverableText, 
+              priority: priority !== undefined ? priority : deliverable.priority,
+              status: status !== undefined ? status : deliverable.status,
+              updated_at: new Date().toISOString() 
+            }
           : deliverable
       ));
     } catch (err: any) {

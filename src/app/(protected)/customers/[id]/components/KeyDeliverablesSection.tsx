@@ -5,8 +5,8 @@ interface KeyDeliverablesSectionProps {
   deliverables: KeyDeliverable[];
   isLoading: boolean;
   error: string | null;
-  onAddDeliverable: (deliverableText: string, isEditable: boolean) => Promise<void>;
-  onUpdateDeliverable: (deliverableId: string, deliverableText: string) => Promise<void>;
+  onAddDeliverable: (deliverableText: string, isEditable: boolean, priority: string, status: string) => Promise<void>;
+  onUpdateDeliverable: (deliverableId: string, deliverableText: string, priority?: string, status?: string) => Promise<void>;
   onDeleteDeliverable: (deliverableId: string) => Promise<void>;
   formatDate: (date: string | null) => string;
 }
@@ -23,8 +23,12 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
   const [showAddForm, setShowAddForm] = useState(false);
   const [newDeliverableText, setNewDeliverableText] = useState('');
   const [newDeliverableEditable, setNewDeliverableEditable] = useState(true);
+  const [newDeliverablePriority, setNewDeliverablePriority] = useState('medium');
+  const [newDeliverableStatus, setNewDeliverableStatus] = useState('not_started');
   const [editingDeliverableId, setEditingDeliverableId] = useState<string | null>(null);
   const [editingDeliverableText, setEditingDeliverableText] = useState('');
+  const [editingDeliverablePriority, setEditingDeliverablePriority] = useState('');
+  const [editingDeliverableStatus, setEditingDeliverableStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Handle add deliverable submission
@@ -34,9 +38,11 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
     
     setIsSubmitting(true);
     try {
-      await onAddDeliverable(newDeliverableText, newDeliverableEditable);
+      await onAddDeliverable(newDeliverableText, newDeliverableEditable, newDeliverablePriority, newDeliverableStatus);
       setNewDeliverableText('');
       setNewDeliverableEditable(true);
+      setNewDeliverablePriority('medium');
+      setNewDeliverableStatus('not_started');
       setShowAddForm(false);
     } catch (error) {
       console.error('Error adding deliverable:', error);
@@ -52,9 +58,11 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
     
     setIsSubmitting(true);
     try {
-      await onUpdateDeliverable(editingDeliverableId, editingDeliverableText);
+      await onUpdateDeliverable(editingDeliverableId, editingDeliverableText, editingDeliverablePriority, editingDeliverableStatus);
       setEditingDeliverableId(null);
       setEditingDeliverableText('');
+      setEditingDeliverablePriority('');
+      setEditingDeliverableStatus('');
     } catch (error) {
       console.error('Error updating deliverable:', error);
     } finally {
@@ -66,12 +74,72 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
   const startEditingDeliverable = (deliverable: KeyDeliverable) => {
     setEditingDeliverableId(deliverable.id);
     setEditingDeliverableText(deliverable.deliverable_text);
+    setEditingDeliverablePriority(deliverable.priority || 'medium');
+    setEditingDeliverableStatus(deliverable.status || 'not_started');
   };
   
   // Cancel editing
   const cancelEditing = () => {
     setEditingDeliverableId(null);
     setEditingDeliverableText('');
+    setEditingDeliverablePriority('');
+    setEditingDeliverableStatus('');
+  };
+  
+  // Helper function to get priority badge color
+  const getPriorityBadgeClasses = (priority: string) => {
+    switch(priority) {
+      case 'high':
+        return 'bg-red-100 text-red-800';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'low':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Helper function to get status badge color
+  const getStatusBadgeClasses = (status: string) => {
+    switch(status) {
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      case 'in_progress':
+        return 'bg-purple-100 text-purple-800';
+      case 'not_started':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Helper function to get status display text
+  const getStatusDisplayText = (status: string) => {
+    switch(status) {
+      case 'completed':
+        return 'Completed';
+      case 'in_progress':
+        return 'In Progress';
+      case 'not_started':
+        return 'Not Started';
+      default:
+        return 'Unknown';
+    }
+  };
+
+  // Helper function to get priority display text
+  const getPriorityDisplayText = (priority: string) => {
+    switch(priority) {
+      case 'high':
+        return 'High';
+      case 'medium':
+        return 'Medium';
+      case 'low':
+        return 'Low';
+      default:
+        return 'Medium';
+    }
   };
   
   return (
@@ -126,15 +194,47 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
                     />
                   </div>
                   
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Priority
+                      </label>
+                      <select
+                        value={newDeliverablePriority}
+                        onChange={(e) => setNewDeliverablePriority(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      >
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={newDeliverableStatus}
+                        onChange={(e) => setNewDeliverableStatus(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      >
+                        <option value="not_started">Not Started</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+                  </div>
+                  
                   <div className="flex items-center">
                     <input
                       type="checkbox"
-                      id="newDeliverableCompleted"
+                      id="newDeliverableEditable"
                       checked={newDeliverableEditable}
                       onChange={(e) => setNewDeliverableEditable(e.target.checked)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
-                    <label htmlFor="newDeliverableCompleted" className="ml-2 block text-sm text-gray-700">
+                    <label htmlFor="newDeliverableEditable" className="ml-2 block text-sm text-gray-700">
                       Make this deliverable editable
                     </label>
                   </div>
@@ -198,17 +298,36 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
                           className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                         />
                         
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id="editDeliverableCompleted"
-                            checked={deliverable.is_editable}
-                            onChange={(e) => setNewDeliverableEditable(e.target.checked)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          />
-                          <label htmlFor="editDeliverableCompleted" className="ml-2 block text-sm text-gray-700">
-                            Make this deliverable editable
-                          </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Priority
+                            </label>
+                            <select
+                              value={editingDeliverablePriority}
+                              onChange={(e) => setEditingDeliverablePriority(e.target.value)}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            >
+                              <option value="high">High</option>
+                              <option value="medium">Medium</option>
+                              <option value="low">Low</option>
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Status
+                            </label>
+                            <select
+                              value={editingDeliverableStatus}
+                              onChange={(e) => setEditingDeliverableStatus(e.target.value)}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            >
+                              <option value="not_started">Not Started</option>
+                              <option value="in_progress">In Progress</option>
+                              <option value="completed">Completed</option>
+                            </select>
+                          </div>
                         </div>
                         
                         <div className="flex justify-end space-x-3">
@@ -237,46 +356,56 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
                       </form>
                     </div>
                   ) : (
-                    <div className="p-4">
-                      <div className="flex items-start mb-3">
-                        <div className="ml-3 flex-grow">
-                          <div className="text-gray-800 whitespace-pre-wrap leading-relaxed">
-                            {deliverable.deliverable_text}
+                    <div className={`p-4 ${!deliverable.is_editable ? 'bg-gray-50 border-l-4 border-gray-300' : 
+                      deliverable.priority === 'high' ? 'border-l-4 border-red-400' : 
+                      deliverable.priority === 'medium' ? 'border-l-4 border-yellow-400' : 
+                      'border-l-4 border-green-400'}`}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 mr-4">
+                          <div className="flex items-center flex-wrap gap-2 mb-2">
+                            {/* Priority Badge */}
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadgeClasses(deliverable.priority)}`}>
+                              {getPriorityDisplayText(deliverable.priority)}
+                            </span>
+                            
+                            {/* Status Badge */}
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClasses(deliverable.status)}`}>
+                              {getStatusDisplayText(deliverable.status)}
+                            </span>
+                            
+                            {/* Non-editable Badge */}
                             {!deliverable.is_editable && (
-                              <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs inline-block">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                 Non-editable
                               </span>
                             )}
                           </div>
+                          <p className="text-gray-700 whitespace-pre-wrap">{deliverable.deliverable_text}</p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Last updated: {formatDate(deliverable.updated_at)}
+                          </p>
                         </div>
-                      </div>
-                      <div className="flex justify-between items-center border-t border-gray-100 pt-3 mt-3">
-                        <div className="flex items-center text-xs text-gray-500">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Updated {formatDate(deliverable.updated_at)}
-                        </div>
-                        <div className="flex space-x-3">
-                          <button
-                            onClick={() => startEditingDeliverable(deliverable)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-10 10a2 2 0 01-.707.707l-4 1a1 1 0 01-1.414-1.414l1-4a2 2 0 01.707-.707l10-10z" />
-                            </svg>
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => onDeleteDeliverable(deliverable.id)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center gap-1"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                            Delete
-                          </button>
-                        </div>
+                        
+                        {deliverable.is_editable && (
+                          <div className="flex flex-shrink-0 space-x-2">
+                            <button
+                              onClick={() => startEditingDeliverable(deliverable)}
+                              className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => onDeleteDeliverable(deliverable.id)}
+                              className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
