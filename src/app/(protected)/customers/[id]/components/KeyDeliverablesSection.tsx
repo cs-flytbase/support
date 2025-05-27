@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
-import { KeyDeliverable } from '../types';
+import { KeyDeliverable, Agent } from '../types';
 
 interface KeyDeliverablesSectionProps {
   deliverables: KeyDeliverable[];
+  agents: Agent[];
   isLoading: boolean;
   error: string | null;
-  onAddDeliverable: (deliverableText: string, isEditable: boolean, priority: string, status: string, agentName?: string) => Promise<void>;
-  onUpdateDeliverable: (deliverableId: string, deliverableText: string, priority?: string, status?: string, agentName?: string) => Promise<void>;
+  onAddDeliverable: (deliverableText: string, isEditable: boolean, priority: string, status: string, agentId?: string) => Promise<void>;
+  onUpdateDeliverable: (deliverableId: string, deliverableText: string, priority?: string, status?: string, agentId?: string) => Promise<void>;
   onDeleteDeliverable: (deliverableId: string) => Promise<void>;
   formatDate: (date: string | null) => string;
+  formatDuration: (seconds: number | null) => string;
 }
 
 export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
   deliverables,
+  agents,
   isLoading,
   error,
   onAddDeliverable,
@@ -25,12 +28,12 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
   const [newDeliverableEditable, setNewDeliverableEditable] = useState(true);
   const [newDeliverablePriority, setNewDeliverablePriority] = useState('medium');
   const [newDeliverableStatus, setNewDeliverableStatus] = useState('not_started');
-  const [newDeliverableAgentName, setNewDeliverableAgentName] = useState('');
+  const [newDeliverableAgentId, setNewDeliverableAgentId] = useState<string | undefined>(undefined);
   const [editingDeliverableId, setEditingDeliverableId] = useState<string | null>(null);
   const [editingDeliverableText, setEditingDeliverableText] = useState('');
   const [editingDeliverablePriority, setEditingDeliverablePriority] = useState('');
   const [editingDeliverableStatus, setEditingDeliverableStatus] = useState('');
-  const [editingDeliverableAgentName, setEditingDeliverableAgentName] = useState('');
+  const [editingDeliverableAgentId, setEditingDeliverableAgentId] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Handle add deliverable submission
@@ -45,13 +48,13 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
         newDeliverableEditable, 
         newDeliverablePriority, 
         newDeliverableStatus,
-        newDeliverableAgentName || undefined
+        newDeliverableAgentId
       );
       setNewDeliverableText('');
       setNewDeliverableEditable(true);
       setNewDeliverablePriority('medium');
       setNewDeliverableStatus('not_started');
-      setNewDeliverableAgentName('');
+      setNewDeliverableAgentId(undefined);
       setShowAddForm(false);
     } catch (error) {
       console.error('Error adding deliverable:', error);
@@ -72,13 +75,13 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
         editingDeliverableText, 
         editingDeliverablePriority, 
         editingDeliverableStatus,
-        editingDeliverableAgentName || undefined
+        editingDeliverableAgentId
       );
       setEditingDeliverableId(null);
       setEditingDeliverableText('');
       setEditingDeliverablePriority('');
       setEditingDeliverableStatus('');
-      setEditingDeliverableAgentName('');
+      setEditingDeliverableAgentId(undefined);
     } catch (error) {
       console.error('Error updating deliverable:', error);
     } finally {
@@ -92,7 +95,7 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
     setEditingDeliverableText(deliverable.deliverable_text);
     setEditingDeliverablePriority(deliverable.priority || 'medium');
     setEditingDeliverableStatus(deliverable.status || 'not_started');
-    setEditingDeliverableAgentName(deliverable.assigned_agent_name || '');
+    setEditingDeliverableAgentId(deliverable.assigned_agent_id || undefined);
   };
   
   // Cancel editing
@@ -101,7 +104,7 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
     setEditingDeliverableText('');
     setEditingDeliverablePriority('');
     setEditingDeliverableStatus('');
-    setEditingDeliverableAgentName('');
+    setEditingDeliverableAgentId(undefined);
   };
   
   // Helper function to get priority badge color
@@ -261,13 +264,18 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Assigned Agent (Optional)
                     </label>
-                    <input
-                      type="text"
-                      value={newDeliverableAgentName}
-                      onChange={(e) => setNewDeliverableAgentName(e.target.value)}
+                    <select
+                      value={newDeliverableAgentId || ""}
+                      onChange={(e) => setNewDeliverableAgentId(e.target.value || undefined)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                      placeholder="Enter agent name..."
-                    />
+                    >
+                      <option value="">Select an agent...</option>
+                      {agents.map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   
                   <div className="flex justify-end space-x-3">
@@ -365,13 +373,18 @@ export const KeyDeliverablesSection: React.FC<KeyDeliverablesSectionProps> = ({
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Assigned Agent (Optional)
                           </label>
-                          <input
-                            type="text"
-                            value={editingDeliverableAgentName}
-                            onChange={(e) => setEditingDeliverableAgentName(e.target.value)}
+                          <select
+                            value={editingDeliverableAgentId || ""}
+                            onChange={(e) => setEditingDeliverableAgentId(e.target.value || undefined)}
                             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            placeholder="Enter agent name..."
-                          />
+                          >
+                            <option value="">Select an agent...</option>
+                            {agents.map((agent) => (
+                              <option key={agent.id} value={agent.id}>
+                                {agent.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         
                         <div className="flex justify-end space-x-3">

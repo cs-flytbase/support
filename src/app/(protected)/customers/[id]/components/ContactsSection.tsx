@@ -15,6 +15,7 @@ interface ContactsSectionProps {
   onEdit: (contact: CustomerContact) => void;
   onDelete: (contactId: string) => void;
   onCancel: () => void;
+  onSetPrimary: (contactId: string) => Promise<void> | void;
   formatDate: (date: string | null) => string;
 }
 

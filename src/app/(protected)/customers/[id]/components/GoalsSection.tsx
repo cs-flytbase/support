@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
-import { CustomerGoal } from '../types';
+import { CustomerGoal, Agent } from '../types';
 
 interface GoalsSectionProps {
   goals: CustomerGoal[];
+  agents: Agent[];
   isLoading: boolean;
   error: string | null;
-  onAddGoal: (goalText: string, priority: string, status: string, agentName?: string) => Promise<void>;
-  onUpdateGoal: (goalId: string, goalText: string, priority?: string, status?: string, agentName?: string) => Promise<void>;
+  onAddGoal: (goalText: string, priority: string, status: string, agentId?: string) => Promise<void>;
+  onUpdateGoal: (goalId: string, goalText: string, priority?: string, status?: string, agentId?: string) => Promise<void>;
   onDeleteGoal: (goalId: string) => Promise<void>;
   formatDate: (date: string | null) => string;
+  formatDuration: (seconds: number | null) => string;
 }
 
 export const GoalsSection: React.FC<GoalsSectionProps> = ({
   goals,
+  agents,
   isLoading,
   error,
   onAddGoal,
@@ -24,12 +27,12 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
   const [newGoalText, setNewGoalText] = useState('');
   const [newGoalPriority, setNewGoalPriority] = useState('medium');
   const [newGoalStatus, setNewGoalStatus] = useState('not_started');
-  const [newGoalAgentName, setNewGoalAgentName] = useState('');
+  const [newGoalAgentId, setNewGoalAgentId] = useState<string | undefined>(undefined);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [editingGoalText, setEditingGoalText] = useState('');
   const [editingGoalPriority, setEditingGoalPriority] = useState('');
   const [editingGoalStatus, setEditingGoalStatus] = useState('');
-  const [editingGoalAgentName, setEditingGoalAgentName] = useState('');
+  const [editingGoalAgentId, setEditingGoalAgentId] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Handle add goal submission
@@ -39,11 +42,11 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
     
     setIsSubmitting(true);
     try {
-      await onAddGoal(newGoalText, newGoalPriority, newGoalStatus, newGoalAgentName || undefined);
+      await onAddGoal(newGoalText, newGoalPriority, newGoalStatus, newGoalAgentId);
       setNewGoalText('');
       setNewGoalPriority('medium');
       setNewGoalStatus('not_started');
-      setNewGoalAgentName('');
+      setNewGoalAgentId(undefined);
       setShowAddForm(false);
     } catch (error) {
       console.error('Error adding goal:', error);
@@ -64,13 +67,13 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
         editingGoalText, 
         editingGoalPriority, 
         editingGoalStatus,
-        editingGoalAgentName || undefined
+        editingGoalAgentId
       );
       setEditingGoalId(null);
       setEditingGoalText('');
       setEditingGoalPriority('');
       setEditingGoalStatus('');
-      setEditingGoalAgentName('');
+      setEditingGoalAgentId(undefined);
     } catch (error) {
       console.error('Error updating goal:', error);
     } finally {
@@ -84,7 +87,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
     setEditingGoalText(goal.goal_text);
     setEditingGoalPriority(goal.priority || 'medium');
     setEditingGoalStatus(goal.status || 'not_started');
-    setEditingGoalAgentName(goal.assigned_agent_name || '');
+    setEditingGoalAgentId(goal.assigned_agent_id || undefined);
   };
   
   // Cancel editing
@@ -93,7 +96,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
     setEditingGoalText('');
     setEditingGoalPriority('');
     setEditingGoalStatus('');
-    setEditingGoalAgentName('');
+    setEditingGoalAgentId(undefined);
   };
   
   // Helper function to get priority badge color
@@ -240,13 +243,18 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Assigned Agent (Optional)
                     </label>
-                    <input
-                      type="text"
-                      value={newGoalAgentName}
-                      onChange={(e) => setNewGoalAgentName(e.target.value)}
+                    <select
+                      value={newGoalAgentId || ""}
+                      onChange={(e) => setNewGoalAgentId(e.target.value || undefined)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                      placeholder="Enter agent name..."
-                    />
+                    >
+                      <option value="">Select an agent...</option>
+                      {agents.map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   
                   <div className="flex justify-end space-x-3">
@@ -344,13 +352,18 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Assigned Agent (Optional)
                           </label>
-                          <input
-                            type="text"
-                            value={editingGoalAgentName}
-                            onChange={(e) => setEditingGoalAgentName(e.target.value)}
+                          <select
+                            value={editingGoalAgentId || ""}
+                            onChange={(e) => setEditingGoalAgentId(e.target.value || undefined)}
                             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            placeholder="Enter agent name..."
-                          />
+                          >
+                            <option value="">Select an agent...</option>
+                            {agents.map((agent) => (
+                              <option key={agent.id} value={agent.id}>
+                                {agent.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         
                         <div className="flex justify-end space-x-3">

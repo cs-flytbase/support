@@ -1,10 +1,13 @@
 import React from 'react';
-import { CustomerDetails } from '../types';
+import { CustomerDetails, CustomerContact } from '../types';
 
 interface EditCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
   formData: Partial<CustomerDetails>;
+  contacts: CustomerContact[];
+  primaryContactId: string | null;
+  onPrimaryContactChange: (contactId: string) => void;
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   onSubmit: (e: React.FormEvent) => void;
   isLoading: boolean;
@@ -14,6 +17,9 @@ export const EditCustomerModal: React.FC<EditCustomerModalProps> = ({
   isOpen,
   onClose,
   formData,
+  contacts,
+  primaryContactId,
+  onPrimaryContactChange,
   onChange,
   onSubmit,
   isLoading,
@@ -35,6 +41,24 @@ export const EditCustomerModal: React.FC<EditCustomerModalProps> = ({
         </div>
         
         <form onSubmit={onSubmit} className="space-y-4">
+          {/* Primary Contact Selection - Moved to top and made more prominent */}
+          <div className="border-b pb-4 mb-4">
+            <h4 className="text-lg font-medium mb-2">Primary Contact</h4>
+            <p className="text-sm text-gray-500 mb-2">Select which contact will be the primary point of contact for this company</p>
+            <select
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              value={primaryContactId || ''}
+              onChange={(e) => onPrimaryContactChange(e.target.value)}
+            >
+              <option value="">Select a primary contact...</option>
+              {contacts.map(contact => (
+                <option key={contact.id} value={contact.id}>
+                  {contact.name} {contact.is_primary ? '(Current Primary)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -46,30 +70,6 @@ export const EditCustomerModal: React.FC<EditCustomerModalProps> = ({
                 value={formData.name || ''}
                 onChange={onChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email || ''}
-                onChange={onChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone || ''}
-                onChange={onChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>

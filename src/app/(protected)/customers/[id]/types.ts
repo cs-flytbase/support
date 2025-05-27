@@ -11,6 +11,8 @@ export interface CustomerDetails {
   customer_profile_update_time: string | null;
   created_at: string;
   updated_at: string;
+  last_call_date?: string | null;
+  primary_contact_id?: string | null;
 }
 
 export interface OrgDetails {
@@ -90,6 +92,15 @@ export interface KeyDeliverable {
   status: string; // 'not_started', 'in_progress', 'completed'
   assigned_agent_id: string | null;
   assigned_agent_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Agent {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string | null;
   created_at: string;
   updated_at: string;
 }

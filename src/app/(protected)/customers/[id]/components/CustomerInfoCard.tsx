@@ -1,16 +1,22 @@
-import React from 'react';
-import { CustomerDetails } from '../types';
+import React, { useState } from 'react';
+import { CustomerDetails, CustomerContact } from '../types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mail, Globe, Phone, Home, Building2, Calendar } from 'lucide-react';
+import { Mail, Globe, Phone, Home, Building2, Calendar, User, UserCheck } from 'lucide-react';
 
 interface CustomerInfoCardProps {
   customer: CustomerDetails;
+  contacts: CustomerContact[];
   onEdit: () => void;
+  onSetPrimaryContact?: (contactId: string) => Promise<void>;
   formatDate: (date: string | null) => string;
 }
 
-export const CustomerInfoCard = ({ customer, onEdit, formatDate }: CustomerInfoCardProps) => {
+export const CustomerInfoCard = ({ customer, contacts, onEdit, onSetPrimaryContact, formatDate }: CustomerInfoCardProps) => {
+  const [isSettingPrimary, setIsSettingPrimary] = useState(false);
+  
+  // Find primary contact
+  const primaryContact = contacts.find(contact => contact.is_primary);
   return (
     <Card className="shadow-md transition-all hover:shadow-lg">
       <CardHeader className="pb-2">
@@ -29,15 +35,38 @@ export const CustomerInfoCard = ({ customer, onEdit, formatDate }: CustomerInfoC
 
       <CardContent className="grid gap-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Email */}
+          {/* Primary Contact */}
+          <div className="flex items-center space-x-2">
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
+            <div className="w-full">
+              <div className="flex items-center">
+                <p className="text-sm font-medium">Primary Contact</p>
+                {primaryContact && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                    Primary
+                  </span>
+                )}
+              </div>
+              
+              <p className="text-sm text-muted-foreground">
+                {primaryContact ? (
+                  primaryContact.name
+                ) : (
+                  'No primary contact set'
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Contact Email */}
           <div className="flex items-center space-x-2">
             <Mail className="h-4 w-4 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium">Email</p>
+              <p className="text-sm font-medium">Contact Email</p>
               <p className="text-sm text-muted-foreground">
-                {customer.email ? (
-                  <a href={`mailto:${customer.email}`} className="text-blue-600 hover:underline">
-                    {customer.email}
+                {primaryContact && primaryContact.email ? (
+                  <a href={`mailto:${primaryContact.email}`} className="text-blue-600 hover:underline">
+                    {primaryContact.email}
                   </a>
                 ) : (
                   'Not provided'
@@ -46,15 +75,15 @@ export const CustomerInfoCard = ({ customer, onEdit, formatDate }: CustomerInfoC
             </div>
           </div>
 
-          {/* Phone */}
+          {/* Contact Phone */}
           <div className="flex items-center space-x-2">
             <Phone className="h-4 w-4 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium">Phone</p>
+              <p className="text-sm font-medium">Contact Phone</p>
               <p className="text-sm text-muted-foreground">
-                {customer.phone ? (
-                  <a href={`tel:${customer.phone}`} className="text-blue-600 hover:underline">
-                    {customer.phone}
+                {primaryContact && primaryContact.phone ? (
+                  <a href={`tel:${primaryContact.phone}`} className="text-blue-600 hover:underline">
+                    {primaryContact.phone}
                   </a>
                 ) : (
                   'Not provided'
@@ -110,7 +139,7 @@ export const CustomerInfoCard = ({ customer, onEdit, formatDate }: CustomerInfoC
       <CardFooter className="flex justify-between text-xs text-muted-foreground border-t pt-4">
         <div className="flex items-center space-x-1">
           <Calendar className="h-3 w-3" />
-          <span>Added: {customer.created_at ? formatDate(customer.created_at) : 'Unknown'}</span>
+          <span>Last Call: {customer.last_call_date ? formatDate(customer.last_call_date) : 'No calls yet'}</span>
         </div>
         <span>ID: {customer.id}</span>
       </CardFooter>

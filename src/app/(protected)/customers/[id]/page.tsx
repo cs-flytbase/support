@@ -41,6 +41,8 @@ export default function CustomerDetailPage() {
   const [participants, setParticipants] = useState<Record<string, Participant[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [contactsError, setContactsError] = useState<string | null>(null);
+  const [callsLoading, setCallsLoading] = useState(true);
+  const [callsError, setCallsError] = useState<string | null>(null);
   
   // Goals state
   const [goals, setGoals] = useState<CustomerGoal[]>([]);
@@ -109,6 +111,58 @@ export default function CustomerDetailPage() {
   });
   const [customerEditLoading, setCustomerEditLoading] = useState(false);
   const [selectedContactForEdit, setSelectedContactForEdit] = useState<CustomerContact | null>(null);
+  const [selectedPrimaryContactId, setSelectedPrimaryContactId] = useState<string | null>(null);
+
+  // Handle primary contact change in edit modal
+  const handlePrimaryContactChange = (contactId: string) => {
+    setSelectedPrimaryContactId(contactId);
+  };
+
+  // Function to set a primary contact
+  const setPrimaryContact = async (contactId: string) => {
+    try {
+      // Step 1: Reset all contacts to not primary
+      const { error: resetError } = await supabase
+        .from('customer_contacts')
+        .update({ is_primary: false })
+        .eq('customer_id', customerId);
+        
+      if (resetError) throw resetError;
+      
+      // Step 2: Set the selected contact as primary
+      const { error: updateError } = await supabase
+        .from('customer_contacts')
+        .update({ is_primary: true })
+        .eq('id', contactId);
+      
+      if (updateError) throw updateError;
+      
+      // Step 3: Update the customer record with the primary_contact_id
+      const { error: customerUpdateError } = await supabase
+        .from('customers')
+        .update({ primary_contact_id: contactId })
+        .eq('id', customerId);
+        
+      if (customerUpdateError) throw customerUpdateError;
+      
+      // Step 4: Update the local state
+      if (customer) {
+        setCustomer({
+          ...customer,
+          primary_contact_id: contactId
+        });
+      }
+      
+      // Reload contacts
+      await loadCustomerContacts();
+      
+      // Show success notification
+      alert('Primary contact updated successfully');
+    } catch (err) {
+      console.error('Error setting primary contact:', err);
+      alert('Failed to update primary contact');
+    }
+  };
 
   // Reset company form with current customer data
   const resetCompanyForm = (customerData: CustomerDetails) => {
@@ -121,6 +175,8 @@ export default function CustomerDetailPage() {
       customer_type: customerData.customer_type || '',
       industry: customerData.industry || ''
     });
+    // Initialize the primary contact ID if available
+    setSelectedPrimaryContactId(customerData.primary_contact_id || null);
   };
   
   // Handle company form input change
@@ -132,22 +188,14 @@ export default function CustomerDetailPage() {
   // Save company changes
   const saveCompanyChanges = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!companyFormData.name) {
-      alert('Company name is required');
-      return;
-    }
-    
     setSaveLoading(true);
-    setError(null);
     
     try {
+      // First update the customer details - omitting primary_contact_id until column is added
       const { error } = await supabase
         .from('customers')
         .update({
           name: companyFormData.name,
-          email: companyFormData.email || null,
-          phone: companyFormData.phone || null,
           website: companyFormData.website || null,
           address: companyFormData.address || null,
           customer_type: companyFormData.customer_type || null,
@@ -158,16 +206,40 @@ export default function CustomerDetailPage() {
       
       if (error) throw error;
       
+      // Check if primary contact has changed
+      if (selectedPrimaryContactId && selectedPrimaryContactId !== customer?.primary_contact_id) {
+        // Reset all contacts to not primary
+        const { error: resetError } = await supabase
+          .from('customer_contacts')
+          .update({ is_primary: false })
+          .eq('customer_id', customerId);
+          
+        if (resetError) throw resetError;
+        
+        // Set the selected contact as primary
+        const { error: updateError } = await supabase
+          .from('customer_contacts')
+          .update({ is_primary: true })
+          .eq('id', selectedPrimaryContactId);
+        
+        if (updateError) throw updateError;
+      }
+      
       // Update the local state
       if (customer) {
         const updatedCustomer = {
           ...customer,
           ...companyFormData,
+          primary_contact_id: selectedPrimaryContactId,
           updated_at: new Date().toISOString()
         };
         setCustomer(updatedCustomer as CustomerDetails);
       }
       
+      // Reload contacts to ensure they reflect any primary contact changes
+      await loadCustomerContacts();
+      
+      // Close the modal
       setShowEditModal(false);
     } catch (err: any) {
       console.error('Error updating company:', err);
@@ -469,6 +541,48 @@ export default function CustomerDetailPage() {
     }
   };
   
+  // Load customer calls
+  const loadCalls = async () => {
+    try {
+      setCalls([]);
+      setCallsLoading(true);
+      setCalls([]);
+      const { data, error } = await supabase
+        .from('calls')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('call_date', { ascending: false });
+
+      if (error) throw error;
+      setCalls(data || []);
+      
+      // Update customer's last call date if calls exist
+      if (data && data.length > 0 && customer) {
+        const lastCallDate = data[0].call_date;
+        
+        // Only update customer in state if the date is different
+        if (customer.last_call_date !== lastCallDate) {
+          setCustomer({
+            ...customer,
+            last_call_date: lastCallDate
+          });
+          
+          // Optionally update the database to store this last call date
+          // This ensures the last_call_date is accurate even if the calls are loaded separately
+          await supabase
+            .from('customers')
+            .update({ last_call_date: lastCallDate })
+            .eq('id', customerId);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading calls:', err);
+      setCallsError('Failed to load call history');
+    } finally {
+      setCallsLoading(false);
+    }
+  };
+
   // Load customer goals
   const loadGoals = async () => {
     setGoalsLoading(true);
@@ -903,6 +1017,7 @@ export default function CustomerDetailPage() {
           {/* Customer Info Card Component */}
           <CustomerInfoCard 
             customer={customer} 
+            contacts={contacts}
             onEdit={() => {
               if (customer) resetCompanyForm(customer);
               setShowEditModal(true);
@@ -977,6 +1092,7 @@ export default function CustomerDetailPage() {
             onEdit={handleEditContact}
             onDelete={handleDeleteContact}
             onCancel={resetContactForm}
+            onSetPrimary={setPrimaryContact}
             formatDate={formatDate}
           />
           
@@ -997,6 +1113,9 @@ export default function CustomerDetailPage() {
             onChange={handleCompanyFormChange}
             onSubmit={saveCompanyChanges}
             isLoading={saveLoading}
+            contacts={contacts}
+            primaryContactId={selectedPrimaryContactId}
+            onPrimaryContactChange={handlePrimaryContactChange}
           />
         </>
       ) : (

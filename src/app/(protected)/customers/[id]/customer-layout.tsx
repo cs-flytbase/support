@@ -1,5 +1,5 @@
 import React from 'react';
-import { CustomerDetails, OrgDetails, CustomerContact, CustomerGoal, KeyDeliverable, Conversation, Call, Participant } from './types';
+import { CustomerDetails, OrgDetails, CustomerContact, CustomerGoal, KeyDeliverable, Conversation, Call, Participant, Agent } from './types';
 import { CustomerInfoCard } from './components/CustomerInfoCard';
 import { CustomerProfileSection } from './components/CustomerProfileSection';
 import { GoalsSection } from './components/GoalsSection';
@@ -36,6 +36,8 @@ interface CustomerLayoutProps {
   showContactForm: boolean;
   saveLoading: boolean;
   availableCompanies: CustomerDetails[];
+  primaryContactId: string | null;
+  agents: Agent[];
   
   // Functions
   resetCompanyForm: (customer: CustomerDetails) => void;
@@ -60,6 +62,7 @@ interface CustomerLayoutProps {
   handleDeleteContact: (contactId: string) => Promise<void>;
   handleCompanyFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   saveCompanyChanges: (e: React.FormEvent) => Promise<void>;
+  onPrimaryContactChange: (contactId: string) => Promise<void>;
 }
 
 const CustomerLayout: React.FC<CustomerLayoutProps> = ({
@@ -89,6 +92,8 @@ const CustomerLayout: React.FC<CustomerLayoutProps> = ({
   showContactForm,
   saveLoading,
   availableCompanies,
+  primaryContactId,
+  agents,
   
   // Functions
   resetCompanyForm,
@@ -113,15 +118,23 @@ const CustomerLayout: React.FC<CustomerLayoutProps> = ({
   handleDeleteContact,
   handleCompanyFormChange,
   saveCompanyChanges,
+  onPrimaryContactChange,
 }) => {
   return (
     <div className="grid grid-cols-1 gap-8">
       {/* Main Section - Customer Info */}
       <div>
         <CustomerInfoCard 
-          customer={customer} 
+          customer={customer}
+          contacts={contacts}
           onEdit={() => {
             if (customer) resetCompanyForm(customer);
+          }}
+          onSetPrimaryContact={async (contactId) => {
+            // This is just a placeholder implementation
+            // The actual functionality is in the page.tsx file
+            console.log('Set primary contact requested:', contactId);
+            return Promise.resolve();
           }}
           formatDate={formatDate}
         />
@@ -141,12 +154,14 @@ const CustomerLayout: React.FC<CustomerLayoutProps> = ({
           {/* Goals Section */}
           <GoalsSection
             goals={goals}
+            agents={agents}
             isLoading={goalsLoading}
             error={goalsError}
             onAddGoal={addGoal}
             onUpdateGoal={updateGoal}
             onDeleteGoal={deleteGoal}
             formatDate={formatDate}
+            formatDuration={formatDuration}
           />
         </div>
         
@@ -155,12 +170,14 @@ const CustomerLayout: React.FC<CustomerLayoutProps> = ({
           {/* Key Deliverables Section */}
           <KeyDeliverablesSection
             deliverables={deliverables}
+            agents={agents}
             isLoading={deliverablesLoading}
             error={deliverablesError}
             onAddDeliverable={addKeyDeliverable}
             onUpdateDeliverable={updateKeyDeliverable}
             onDeleteDeliverable={deleteKeyDeliverable}
             formatDate={formatDate}
+            formatDuration={formatDuration}
           />
           
           {/* Organization Section Component */}
@@ -199,6 +216,7 @@ const CustomerLayout: React.FC<CustomerLayoutProps> = ({
             onSave={saveContact}
             onEdit={handleEditContact}
             onDelete={handleDeleteContact}
+            onSetPrimary={onPrimaryContactChange}
             formatDate={formatDate}
           />
         </div>
@@ -221,6 +239,9 @@ const CustomerLayout: React.FC<CustomerLayoutProps> = ({
           isOpen={showEditModal}
           onClose={() => {}}
           formData={formData}
+          contacts={contacts}
+          primaryContactId={primaryContactId}
+          onPrimaryContactChange={onPrimaryContactChange}
           onChange={handleCompanyFormChange}
           onSubmit={saveCompanyChanges}
           isLoading={saveLoading}
