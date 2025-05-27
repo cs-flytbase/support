@@ -1,5 +1,8 @@
 import React from 'react';
 import { CustomerDetails } from '../types';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Mail, Globe, Phone, Home, Building2, Calendar } from 'lucide-react';
 
 interface CustomerInfoCardProps {
   customer: CustomerDetails;
@@ -7,97 +10,110 @@ interface CustomerInfoCardProps {
   formatDate: (date: string | null) => string;
 }
 
-export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({ 
-  customer, 
-  onEdit, 
-  formatDate 
-}) => {
+export const CustomerInfoCard = ({ customer, onEdit, formatDate }: CustomerInfoCardProps) => {
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6 sm:mb-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-0">
-        <h2 className="text-lg sm:text-xl font-semibold">Customer Information</h2>
-        <button
-          onClick={onEdit}
-          className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-          </svg>
-          Edit Company
-        </button>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500">Name</p>
-          <p className="text-base sm:text-lg break-words">{customer.name}</p>
+    <Card className="shadow-md transition-all hover:shadow-lg">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle className="text-xl font-bold">{customer.name}</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              {customer.customer_type || 'Customer'}
+            </CardDescription>
+          </div>
+          <Button variant="outline" onClick={onEdit} className="ml-auto">
+            Edit Details
+          </Button>
         </div>
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500">Email</p>
-          <p className="text-base sm:text-lg break-words">
-            {customer.email ? (
-              <a href={`mailto:${customer.email}`} className="text-blue-600 hover:underline">
-                {customer.email}
-              </a>
-            ) : (
-              'N/A'
-            )}
-          </p>
+      </CardHeader>
+
+      <CardContent className="grid gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Email */}
+          <div className="flex items-center space-x-2">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Email</p>
+              <p className="text-sm text-muted-foreground">
+                {customer.email ? (
+                  <a href={`mailto:${customer.email}`} className="text-blue-600 hover:underline">
+                    {customer.email}
+                  </a>
+                ) : (
+                  'Not provided'
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Phone */}
+          <div className="flex items-center space-x-2">
+            <Phone className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Phone</p>
+              <p className="text-sm text-muted-foreground">
+                {customer.phone ? (
+                  <a href={`tel:${customer.phone}`} className="text-blue-600 hover:underline">
+                    {customer.phone}
+                  </a>
+                ) : (
+                  'Not provided'
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Website */}
+          <div className="flex items-center space-x-2">
+            <Globe className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Website</p>
+              <p className="text-sm text-muted-foreground">
+                {customer.website ? (
+                  <a
+                    href={customer.website.startsWith('http') ? customer.website : `https://${customer.website}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    {customer.website}
+                  </a>
+                ) : (
+                  'Not provided'
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Customer Type */}
+          <div className="flex items-center space-x-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Type</p>
+              <p className="text-sm text-muted-foreground">{customer.customer_type || 'Not specified'}</p>
+            </div>
+          </div>
         </div>
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500">Phone</p>
-          <p className="text-base sm:text-lg">
-            {customer.phone ? (
-              <a href={`tel:${customer.phone}`} className="text-blue-600 hover:underline">
-                {customer.phone}
-              </a>
-            ) : (
-              'N/A'
-            )}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500">Website</p>
-          <p className="text-base sm:text-lg break-words">
-            {customer.website ? (
-              <a 
-                href={customer.website.startsWith('http') ? customer.website : `https://${customer.website}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-              >
-                {customer.website.replace(/^https?:\/\//, '')}
-              </a>
-            ) : (
-              'N/A'
-            )}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500">Customer Type</p>
-          <p className="text-base sm:text-lg">
-            <span className="px-2 py-0.5 sm:py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-              {customer.customer_type?.replace('_', ' ') || 'Not Specified'}
-            </span>
-          </p>
-        </div>
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500">Industry</p>
-          <p className="text-base sm:text-lg">{customer.industry || 'N/A'}</p>
-        </div>
+
+        {/* Address (if available) */}
         {customer.address && (
-          <div className="sm:col-span-2 lg:col-span-3">
-            <p className="text-xs sm:text-sm text-gray-500">Address</p>
-            <p className="text-base sm:text-lg break-words">{customer.address}</p>
+          <div className="flex items-start space-x-2 pt-2 border-t">
+            <Home className="h-4 w-4 text-muted-foreground mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">Address</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.address}</p>
+            </div>
           </div>
         )}
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500">Created</p>
-          <p className="text-base sm:text-lg">{formatDate(customer.created_at)}</p>
+      </CardContent>
+
+      <CardFooter className="flex justify-between text-xs text-muted-foreground border-t pt-4">
+        <div className="flex items-center space-x-1">
+          <Calendar className="h-3 w-3" />
+          <span>Added: {customer.created_at ? formatDate(customer.created_at) : 'Unknown'}</span>
         </div>
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500">Last Updated</p>
-          <p className="text-base sm:text-lg">{formatDate(customer.updated_at)}</p>
-        </div>
-      </div>
-    </div>
+        <span>ID: {customer.id}</span>
+      </CardFooter>
+    </Card>
   );
 };
