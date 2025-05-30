@@ -34,6 +34,7 @@ export default function ContactsPage() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [editContactForm, setEditContactForm] = useState<Partial<Contact>>({});
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   
   const router = useRouter();
@@ -268,12 +269,14 @@ export default function ContactsPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation(); // Prevent navigation to customer page
+                          // Initialize edit form with current contact data
                           setEditingContact(contact);
+                          setEditContactForm({...contact});
                           setShowEditModal(true);
                         }}
                         className="text-blue-600 hover:text-blue-900"
                       >
-                        Change Customer
+                        Edit Contact
                       </button>
                     </td>
                   </tr>
@@ -284,42 +287,98 @@ export default function ContactsPage() {
         </div>
       )}
 
-      {/* Edit Modal for Changing Customer */}
+      {/* Edit Contact Modal */}
       {showEditModal && editingContact && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Change Customer for {editingContact.name}</h3>
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Edit Contact: {editingContact.name}</h3>
             
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Current Customer
-              </label>
-              <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
-                {editingContact.customer_name || 'Not assigned'}
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name *
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editContactForm.name || ''}
+                  onChange={(e) => setEditContactForm({...editContactForm, name: e.target.value})}
+                  required
+                />
               </div>
-            </div>
-            
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                New Customer
-              </label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={editingContact.customer_id || ''}
-                onChange={(e) => {
-                  setEditingContact({
-                    ...editingContact,
-                    customer_id: e.target.value
-                  });
-                }}
-              >
-                <option value="">-- Select a Customer --</option>
-                {customers.map(customer => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
+              
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editContactForm.email || ''}
+                  onChange={(e) => setEditContactForm({...editContactForm, email: e.target.value})}
+                />
+              </div>
+              
+              {/* Phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone
+                </label>
+                <input
+                  type="tel"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editContactForm.phone || ''}
+                  onChange={(e) => setEditContactForm({...editContactForm, phone: e.target.value})}
+                />
+              </div>
+              
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editContactForm.title || ''}
+                  onChange={(e) => setEditContactForm({...editContactForm, title: e.target.value})}
+                />
+              </div>
+              
+              {/* Customer */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editContactForm.customer_id || ''}
+                  onChange={(e) => setEditContactForm({...editContactForm, customer_id: e.target.value})}
+                >
+                  <option value="">-- Select a Customer --</option>
+                  {customers.map(customer => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Is Primary */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="is_primary"
+                  checked={editContactForm.is_primary || false}
+                  onChange={(e) => setEditContactForm({...editContactForm, is_primary: e.target.checked})}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="is_primary" className="ml-2 block text-sm text-gray-900">
+                  Primary Contact
+                </label>
+              </div>
             </div>
             
             <div className="flex justify-end space-x-3">
@@ -331,27 +390,61 @@ export default function ContactsPage() {
               </button>
               <button
                 onClick={async () => {
+                  if (!editContactForm.name) {
+                    alert('Contact name is required');
+                    return;
+                  }
+                  
                   try {
                     const supabase = createClient();
                     
-                    // Update the contact's customer_id in the database
+                    // Prepare update data
+                    const updateData = {
+                      name: editContactForm.name,
+                      email: editContactForm.email || null,
+                      phone: editContactForm.phone || null,
+                      title: editContactForm.title || null,
+                      customer_id: editContactForm.customer_id || null,
+                      is_primary: editContactForm.is_primary || false,
+                      updated_at: new Date().toISOString()
+                    };
+                    
+                    // Update the contact in the database
                     const { error } = await supabase
                       .from('customer_contacts')
-                      .update({ 
-                        customer_id: editingContact.customer_id,
-                        updated_at: new Date().toISOString()
-                      })
+                      .update(updateData)
                       .eq('id', editingContact.id);
                       
                     if (error) throw error;
+                    
+                    // If the contact is marked as primary, reset other contacts of the same customer
+                    if (updateData.is_primary && updateData.customer_id) {
+                      await supabase
+                        .from('customer_contacts')
+                        .update({ is_primary: false })
+                        .eq('customer_id', updateData.customer_id)
+                        .neq('id', editingContact.id);
+                        
+                      // Also update the customer's primary_contact_id
+                      await supabase
+                        .from('customers')
+                        .update({ primary_contact_id: editingContact.id })
+                        .eq('id', updateData.customer_id);
+                    }
                     
                     // Update the contact in the local state
                     setContacts(contacts.map(c => 
                       c.id === editingContact.id 
                         ? {
-                            ...c, 
-                            customer_id: editingContact.customer_id,
-                            customer_name: customers.find(cust => cust.id === editingContact.customer_id)?.name || c.customer_name
+                            ...c,
+                            name: updateData.name,
+                            email: updateData.email,
+                            phone: updateData.phone,
+                            title: updateData.title,
+                            customer_id: updateData.customer_id,
+                            is_primary: updateData.is_primary,
+                            customer_name: customers.find(cust => cust.id === updateData.customer_id)?.name || c.customer_name,
+                            updated_at: updateData.updated_at
                           }
                         : c
                     ));
@@ -359,16 +452,16 @@ export default function ContactsPage() {
                     // Close the modal and show success message
                     setShowEditModal(false);
                     setError(null);
-                    alert(`Contact ${editingContact.name} has been moved to ${customers.find(c => c.id === editingContact.customer_id)?.name}`);
+                    alert(`Contact updated successfully!`);
                   } catch (err: any) {
-                    console.error('Error updating contact customer:', err);
-                    setError(err.message || 'Failed to update contact customer');
+                    console.error('Error updating contact:', err);
+                    setError(err.message || 'Failed to update contact');
                   }
                 }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                disabled={!editingContact.customer_id}
+                disabled={!editContactForm.name || !editContactForm.customer_id}
               >
-                Update Customer
+                Save Changes
               </button>
             </div>
           </div>
