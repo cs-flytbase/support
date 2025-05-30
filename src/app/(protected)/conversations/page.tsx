@@ -121,7 +121,7 @@ const ConversationsPage = () => {
       const { data, error } = await supabase
         .from('conversations')
         .select('*')
-        .eq('user_id', supabaseUserId)
+        // .eq('user_id', supabaseUserId)
         .order('updated_at', { ascending: false })
       
       if (error) throw error

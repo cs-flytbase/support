@@ -27,6 +27,11 @@ export const CommunicationTabs: React.FC<CommunicationTabsProps> = ({
   const navigateToCallDetails = (callId: string) => {
     router.push(`/calls/${callId}`);
   };
+  
+  // Function to navigate to conversation details page
+  const navigateToConversationDetails = (conversationId: string) => {
+    router.push(`/conversations/${conversationId}`);
+  };
   return (
     <Card className="mt-8 shadow-md">
       <div className="bg-gradient-to-r from-gray-50 to-slate-50 px-6 py-4 border-b border-gray-200">
@@ -88,9 +93,13 @@ export const CommunicationTabs: React.FC<CommunicationTabsProps> = ({
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {conversations.map((conversation) => (
-                    <tr key={conversation.id} className="hover:bg-slate-50 transition-colors">
+                    <tr 
+                      key={conversation.id} 
+                      className="hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => navigateToConversationDetails(conversation.id)}
+                    >
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-medium text-slate-900">{conversation.title}</div>
+                        <div className="text-sm font-medium text-blue-600 hover:underline">{conversation.title}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-100">
@@ -177,7 +186,7 @@ export const CommunicationTabs: React.FC<CommunicationTabsProps> = ({
                       onClick={() => navigateToCallDetails(call.id)}
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-medium text-slate-900 text-blue-600 hover:underline">{call.name}</div>
+                        <div className="text-sm font-medium text-blue-600 hover:underline">{call.name}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <Badge className={

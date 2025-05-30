@@ -114,7 +114,7 @@ export const ContactsSection: React.FC<ContactsSectionProps> = ({
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Associated Company
+                  Associated Company (Change Customer)
                 </label>
                 <select
                   name="customer_id"
