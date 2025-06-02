@@ -5,9 +5,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProgressCircle } from '@/components/ui/progress-circle';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { LineChart } from '@/components/ui/line-chart';
+import { CustomerInfoCard } from './CustomerInfoCard';
+import { CustomerDetails, CustomerContact } from '../types';
 
 interface CustomerDashboardProps {
-  customerName: string;
+  customer: CustomerDetails;
+  contacts: CustomerContact[];
+  onEdit: () => void;
+  onSetPrimaryContact?: (contactId: string) => Promise<void>;
+  formatDate: (date: string | null) => string;
   status: string;
   plan: string;
   lifecycleStage: string;
@@ -32,7 +38,11 @@ interface CustomerDashboardProps {
 }
 
 export function CustomerDashboard({
-  customerName,
+  customer,
+  contacts,
+  onEdit,
+  onSetPrimaryContact,
+  formatDate,
   status,
   plan,
   lifecycleStage,
@@ -51,29 +61,14 @@ export function CustomerDashboard({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Customer Overview Card */}
-        <Card className="md:col-span-1">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-2xl font-bold">{customerName}</CardTitle>
-            <Badge variant={status === 'Active' ? 'default' : 'secondary'} className="mt-2 bg-blue-100 text-blue-800 hover:bg-blue-100">
-              {status}
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Plan</p>
-                <p className="text-lg font-semibold">{plan}</p>
-              </div>
-              {assignedAgent && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Assigned Agent</p>
-                  <p className="text-lg font-semibold">{assignedAgent}</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Customer Info Card */}
+        <CustomerInfoCard
+          customer={customer}
+          contacts={contacts}
+          onEdit={onEdit}
+          onSetPrimaryContact={onSetPrimaryContact}
+          formatDate={formatDate}
+        />
 
         {/* Health Score Card */}
         <Card className="md:col-span-1">
