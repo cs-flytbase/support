@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { X, Mail, User, Building, Clock, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 // Define the Email type
 type Email = {
@@ -22,13 +23,12 @@ type Email = {
   key_points: any[] | null;
 };
 
-// Define the proper PageProps type for Next.js
-type EmailDetailPageProps = {
-  params: { id: string }
-}
-
-export default function EmailDetailPage({ params }: EmailDetailPageProps) {
-  // Access params directly with proper typing
+// Use a client component wrapper to handle params
+export default function EmailDetailPage() {
+  // Get the id from the URL params using useParams hook
+  const params = useParams();
+  const emailId = params?.id as string;
+  
   const [email, setEmail] = useState<Email | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,73 +42,73 @@ export default function EmailDetailPage({ params }: EmailDetailPageProps) {
   };
   
   // Load email data
-  useEffect(() => {
-    const loadEmail = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        // Fetch the email by ID
-        const { data, error: emailError } = await supabase
-          .from('email')
-          .select('*')
-          .eq('id', params.id)
-          .single();
-        
-        if (emailError) throw emailError;
-        
-        if (!data) {
-          setError('Email not found');
-          setIsLoading(false);
-          return;
-        }
-        
-        // If we have company_id or contact_id, fetch the details
-        let companyName = data.company_name;
-        let contactName = data.contact_name;
-        
-        // If company_id exists but company_name doesn't, fetch it
-        if (data.company_id && !data.company_name) {
-          const { data: companyData, error: companyError } = await supabase
-            .from('customers')
-            .select('name')
-            .eq('id', data.company_id)
-            .single();
-          
-          if (!companyError && companyData) {
-            companyName = companyData.name;
-          }
-        }
-        
-        // If contact_id exists but contact_name doesn't, fetch it
-        if (data.contact_id && !data.contact_name) {
-          const { data: contactData, error: contactError } = await supabase
-            .from('customer_contacts')
-            .select('name')
-            .eq('id', data.contact_id)
-            .single();
-          
-          if (!contactError && contactData) {
-            contactName = contactData.name;
-          }
-        }
-        
-        // Set the email with potentially updated fields
-        setEmail({
-          ...data,
-          company_name: companyName,
-          contact_name: contactName
-        });
-      } catch (err: any) {
-        console.error('Error loading email:', err);
-        setError(err.message || 'Failed to load email details');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadEmail = async () => {
+    setIsLoading(true);
+    setError(null);
     
+    if (!emailId) {
+      setError('Email ID is missing');
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      // Fetch the email by ID
+      const { data, error: emailError } = await supabase
+        .from('email')
+        .select('*')
+        .eq('id', emailId)
+        .single();
+      
+      if (emailError) throw emailError;
+      
+      if (!data) {
+        throw new Error('Email not found');
+      }
+      
+      // Enhanced data with proper contact and company information
+      let enhancedData = { ...data };
+      
+      // If we have a contact_id, fetch contact details
+      if (data.contact_id) {
+        const { data: contactData, error: contactError } = await supabase
+          .from('customer_contacts')
+          .select('id, name, email, phone')
+          .eq('id', data.contact_id)
+          .single();
+          
+        if (!contactError && contactData) {
+          enhancedData.contact_name = contactData.name;
+          enhancedData.contact_email = contactData.email;
+          enhancedData.contact_phone = contactData.phone;
+        }
+      }
+      
+      // If we have a company_id, fetch company details
+      if (data.company_id) {
+        const { data: companyData, error: companyError } = await supabase
+          .from('customers')
+          .select('id, name')
+          .eq('id', data.company_id)
+          .single();
+          
+        if (!companyError && companyData) {
+          enhancedData.company_name = companyData.name;
+        }
+      }
+      
+      setEmail(enhancedData);
+    } catch (err: any) {
+      console.error('Error loading email:', err);
+      setError(err.message || 'Failed to load email details');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  useEffect(() => {    
     loadEmail();
-  }, [params.id, supabase]);
+  }, [emailId, supabase]);
   
   // Get sentiment badge
   const getSentimentBadge = (sentiment: number | null) => {
@@ -180,7 +180,13 @@ export default function EmailDetailPage({ params }: EmailDetailPageProps) {
                   <Building className="h-5 w-5 text-gray-400 mt-0.5" />
                   <div>
                     <h3 className="text-sm font-medium text-gray-500">Company</h3>
-                    <p className="text-sm">{email.company_name}</p>
+                    {email.company_id ? (
+                      <Link href={`/customers/${email.company_id}`} className="text-sm text-blue-600 hover:underline">
+                        {email.company_name}
+                      </Link>
+                    ) : (
+                      <p className="text-sm">{email.company_name}</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -190,7 +196,13 @@ export default function EmailDetailPage({ params }: EmailDetailPageProps) {
                   <User className="h-5 w-5 text-gray-400 mt-0.5" />
                   <div>
                     <h3 className="text-sm font-medium text-gray-500">Contact</h3>
-                    <p className="text-sm">{email.contact_name}</p>
+                    {email.contact_id ? (
+                      <Link href={`/contacts/${email.contact_id}`} className="text-sm text-blue-600 hover:underline">
+                        {email.contact_name}
+                      </Link>
+                    ) : (
+                      <p className="text-sm">{email.contact_name}</p>
+                    )}
                   </div>
                 </div>
               )}
