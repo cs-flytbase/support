@@ -42,8 +42,10 @@ export default function Navigation() {
         <div className="hidden md:flex items-center space-x-1">
           <NavLink href="/conversations">Conversations</NavLink>
           <NavLink href="/calls">Calls</NavLink>
+          <NavLink href="/emails">Emails</NavLink>
           <NavLink href="/customers">Customers</NavLink>
           <NavLink href="/contacts">Contacts</NavLink>
+          <NavLink href="/agents">Agents</NavLink>
           <NavLink href="/issues">Issues</NavLink>
           <NavLink href="/ai-agent/knowledge-base">AI Agent</NavLink>
           <NavLink href="/settings">Settings</NavLink>
@@ -76,8 +78,10 @@ export default function Navigation() {
           <div className="flex flex-col space-y-2">
             <NavLink href="/conversations" className="block w-full">Conversations</NavLink>
             <NavLink href="/calls" className="block w-full">Calls</NavLink>
+            <NavLink href="/emails" className="block w-full">Emails</NavLink>
             <NavLink href="/customers" className="block w-full">Customers</NavLink>
             <NavLink href="/contacts" className="block w-full">Contacts</NavLink>
+            <NavLink href="/agents" className="block w-full">Agents</NavLink>
             <NavLink href="/issues" className="block w-full">Issues</NavLink>
             <NavLink href="/ai-agent/knowledge-base" className="block w-full">AI Agent</NavLink>
             <NavLink href="/settings" className="block w-full">Settings</NavLink>
