@@ -86,6 +86,28 @@ export default function CallDetailPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeletingParticipant, setIsDeletingParticipant] = useState(false);
+  const [activeTab, setActiveTab] = useState<'analysis' | 'participants' | 'transcript'>('analysis');
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  
+  // Function to copy transcript to clipboard
+  const copyTranscriptToClipboard = () => {
+    if (!call?.transcript) return;
+    
+    const textToCopy = typeof call.transcript === 'string' 
+      ? call.transcript 
+      : JSON.stringify(call.transcript, null, 2);
+    
+    navigator.clipboard.writeText(textToCopy)
+      .then(() => {
+        setCopySuccess('Copied!');
+        setTimeout(() => setCopySuccess(null), 2000);
+      })
+      .catch(err => {
+        console.error('Failed to copy: ', err);
+        setCopySuccess('Failed to copy');
+        setTimeout(() => setCopySuccess(null), 2000);
+      });
+  };
 
   // Fetch call data, participants, and analysis
   useEffect(() => {
@@ -371,21 +393,33 @@ export default function CallDetailPage() {
         </div>
       </div>
 
-      {/* Call Content - Tabs for Participants and Analysis */}
+      {/* Call Content - Tabs for Participants and Transcript */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex">
-            <button className="w-1/2 py-3 sm:py-4 px-1 text-center border-b-2 border-blue-500 font-medium text-xs sm:text-sm text-blue-600">
+            <button 
+              onClick={() => setActiveTab('analysis')}
+              className={`w-1/3 py-3 sm:py-4 px-1 text-center border-b-2 ${activeTab === 'analysis' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} font-medium text-xs sm:text-sm`}
+            >
+              Call Analysis {analysis ? '✓' : ''}
+            </button>
+            <button 
+              onClick={() => setActiveTab('participants')}
+              className={`w-1/3 py-3 sm:py-4 px-1 text-center border-b-2 ${activeTab === 'participants' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} font-medium text-xs sm:text-sm`}
+            >
               Participants ({participants.length})
             </button>
-            <button className="w-1/2 py-3 sm:py-4 px-1 text-center border-b-2 border-transparent font-medium text-xs sm:text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
-              Call Analysis {analysis ? '✓' : ''}
+            <button 
+              onClick={() => setActiveTab('transcript')}
+              className={`w-1/3 py-3 sm:py-4 px-1 text-center border-b-2 ${activeTab === 'transcript' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} font-medium text-xs sm:text-sm`}
+            >
+              Call Transcript {call?.transcript ? '✓' : ''}
             </button>
           </nav>
         </div>
         
         {/* Participants Section */}
-        <div className="p-3 sm:p-6">
+        {activeTab === 'participants' && <div className="p-3 sm:p-6">
           <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Call Participants</h2>
           
           {participants.length === 0 ? (
@@ -438,10 +472,40 @@ export default function CallDetailPage() {
             </div>
           )}
           
-          {/* Call Analysis Section */}
-          {analysis && (
-            <div className="mt-8">
-              <h2 className="text-xl font-semibold mb-4">Call Analysis</h2>
+        </div>}
+        
+        {/* Call Transcript Section */}
+        {activeTab === 'transcript' && <div className="p-3 sm:p-6">
+          <div className="flex justify-between items-center mb-3 sm:mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold">Call Transcript</h2>
+            {call?.transcript && (
+              <button
+                onClick={copyTranscriptToClipboard}
+                className="flex items-center text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors duration-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                {copySuccess ? copySuccess : 'Copy Transcript'}
+              </button>
+            )}
+          </div>
+          
+          {call?.transcript ? (
+            <div className="bg-gray-50 rounded-lg p-4 whitespace-pre-wrap font-mono text-sm">
+              {typeof call.transcript === 'string' ? call.transcript : JSON.stringify(call.transcript, null, 2)}
+            </div>
+          ) : (
+            <p className="text-gray-500">No transcript available for this call.</p>
+          )}
+        </div>}
+        
+        {/* Call Analysis Section */}
+        {activeTab === 'analysis' && <div className="p-3 sm:p-6">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Call Analysis</h2>
+          
+          {analysis ? (
+            <div>
               
               {/* Summary and Main Metrics */}
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
@@ -455,7 +519,7 @@ export default function CallDetailPage() {
                   <div className="text-xs sm:text-sm text-gray-500">Overall Sentiment</div>
                   <div className="mt-1 flex items-center">
                     <span className="text-xl sm:text-2xl font-semibold">{analysis.overall_sentiment?.toFixed(1) || 'N/A'}</span>
-                    <span className="text-xs sm:text-sm text-gray-500 ml-1">/10</span>
+                    <span className="text-xs sm:text-sm text-gray-500 ml-1">/1</span>
                   </div>
                 </div>
                 
@@ -463,7 +527,7 @@ export default function CallDetailPage() {
                   <div className="text-xs sm:text-sm text-gray-500">Customer Sentiment</div>
                   <div className="mt-1 flex items-center">
                     <span className="text-xl sm:text-2xl font-semibold">{analysis.customer_sentiment?.toFixed(1) || 'N/A'}</span>
-                    <span className="text-xs sm:text-sm text-gray-500 ml-1">/10</span>
+                    <span className="text-xs sm:text-sm text-gray-500 ml-1">/1</span>
                   </div>
                 </div>
                 
@@ -581,8 +645,10 @@ export default function CallDetailPage() {
                 </div>
               </div>
             </div>
+          ) : (
+            <p className="text-gray-500">No analysis available for this call.</p>
           )}
-        </div>
+        </div>}
       </div>
       {/* Edit Customer Modal */}
       {isEditingCustomer && (
