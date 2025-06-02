@@ -22,9 +22,13 @@ type Email = {
   key_points: any[] | null;
 };
 
-export default function EmailDetailPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
-  // Unwrap params using React.use() for Next.js compatibility
-  const unwrappedParams = params instanceof Promise ? React.use(params) : params;
+// Define the proper PageProps type for Next.js
+type EmailDetailPageProps = {
+  params: { id: string }
+}
+
+export default function EmailDetailPage({ params }: EmailDetailPageProps) {
+  // Access params directly with proper typing
   const [email, setEmail] = useState<Email | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +52,7 @@ export default function EmailDetailPage({ params }: { params: Promise<{ id: stri
         const { data, error: emailError } = await supabase
           .from('email')
           .select('*')
-          .eq('id', unwrappedParams.id)
+          .eq('id', params.id)
           .single();
         
         if (emailError) throw emailError;
@@ -104,7 +108,7 @@ export default function EmailDetailPage({ params }: { params: Promise<{ id: stri
     };
     
     loadEmail();
-  }, [unwrappedParams.id, supabase]);
+  }, [params.id, supabase]);
   
   // Get sentiment badge
   const getSentimentBadge = (sentiment: number | null) => {
