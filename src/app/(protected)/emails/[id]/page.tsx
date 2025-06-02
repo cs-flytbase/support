@@ -22,7 +22,9 @@ type Email = {
   key_points: any[] | null;
 };
 
-export default function EmailDetailPage({ params }: { params: { id: string } }) {
+export default function EmailDetailPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
+  // Unwrap params using React.use() for Next.js compatibility
+  const unwrappedParams = params instanceof Promise ? React.use(params) : params;
   const [email, setEmail] = useState<Email | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export default function EmailDetailPage({ params }: { params: { id: string } }) 
         const { data, error: emailError } = await supabase
           .from('email')
           .select('*')
-          .eq('id', params.id)
+          .eq('id', unwrappedParams.id)
           .single();
         
         if (emailError) throw emailError;
@@ -102,7 +104,7 @@ export default function EmailDetailPage({ params }: { params: { id: string } }) 
     };
     
     loadEmail();
-  }, [params.id, supabase]);
+  }, [unwrappedParams.id, supabase]);
   
   // Get sentiment badge
   const getSentimentBadge = (sentiment: number | null) => {
