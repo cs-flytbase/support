@@ -30,95 +30,12 @@ type Email = {
   key_points: any[] | null;
 };
 
-// Email Detail Drawer Component
-const EmailDetailDrawer = ({ 
-  email, 
-  onClose 
-}: { 
-  email: Email; 
-  onClose: () => void;
-}) => {
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex justify-end">
-      <div className="bg-white w-full max-w-md p-6 overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-semibold">Email Details</h2>
-          <Button variant="ghost" onClick={onClose}>&times;</Button>
-        </div>
-        
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm font-medium text-gray-500">From</h3>
-            <p className="text-lg">{email.sender_email}</p>
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-gray-500">Company</h3>
-            <p className="text-lg">{email.company_name || 'N/A'}</p>
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-gray-500">Contact</h3>
-            <p className="text-lg">{email.contact_name || 'N/A'}</p>
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-gray-500">Date</h3>
-            <p className="text-lg">{format(new Date(email.created_at), 'PPP p')}</p>
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-gray-500">Sentiment</h3>
-            <div className="flex items-center mt-1">
-              <Badge 
-                className={email.sentiment && email.sentiment >= 0.5 ? 'bg-green-100 text-green-800' : 
-                          email.sentiment && email.sentiment <= 0.3 ? 'bg-red-100 text-red-800' : 
-                          'bg-yellow-100 text-yellow-800'}
-              >
-                {email.sentiment && email.sentiment >= 0.5 ? 'Positive' : 
-                 email.sentiment && email.sentiment <= 0.3 ? 'Negative' : 'Neutral'}
-              </Badge>
-              <span className="ml-2 text-sm text-gray-500">
-                {email.sentiment ? Math.round(email.sentiment * 100) + '%' : 'N/A'}
-              </span>
-            </div>
-            {email.sentement_reason && (
-              <p className="mt-1 text-sm text-gray-600">{email.sentement_reason}</p>
-            )}
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-gray-500">Email Content</h3>
-            <div className="mt-2 p-4 bg-gray-50 rounded-md">
-              <p className="whitespace-pre-wrap">{email.email_body || 'No content available'}</p>
-            </div>
-          </div>
-          
-          {email.key_points && email.key_points.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Key Points</h3>
-              <ul className="mt-2 space-y-1 list-disc list-inside">
-                {email.key_points.map((point, index) => (
-                  <li key={index} className="text-sm">
-                    {typeof point === 'string' ? point : JSON.stringify(point)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // Main Email Page Component
 export default function EmailsPage() {
   // Client-side state
   const [emails, setEmails] = useState<Email[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sentimentFilter, setSentimentFilter] = useState<string>('all');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Email, direction: 'asc' | 'desc' }>({ 
@@ -401,7 +318,7 @@ export default function EmailsPage() {
                       <TableRow 
                         key={email.id} 
                         className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => setSelectedEmail(email)}
+                        onClick={() => router.push(`/emails/${email.id}`)}
                       >
                         <TableCell className="whitespace-nowrap">
                           <div className="flex items-center">
@@ -427,14 +344,7 @@ export default function EmailsPage() {
           )}
         </CardContent>
       </Card>
-      
-      {/* Email Detail Drawer */}
-      {selectedEmail && (
-        <EmailDetailDrawer 
-          email={selectedEmail} 
-          onClose={() => setSelectedEmail(null)} 
-        />
-      )}
+      {/* Email detail is now handled by the /emails/[id] route */}
     </div>
   );
 }
