@@ -120,23 +120,16 @@ export const CommunicationTabs: React.FC<CommunicationTabsProps> = ({
     loadEmails();
   }, [customerId]);
   
-  // Fix loading state issue when data is available
+  // Check if data is already available when component mounts
   useEffect(() => {
-    // If we have data but isLoading is still true, force it to false
+    // If we already have data, we should not be in a loading state
     if (calls.length > 0 && isLoading) {
-      console.log('Fixing loading state: Data available but loading is still true');
-      // Simulate the end of loading after a brief delay to prevent flashing
-      const timer = setTimeout(() => {
-        // We can't directly modify the isLoading prop, but we can trigger the reload function
-        // which will reset the loading state properly
-        if (onReloadCalls) {
-          onReloadCalls();
-        }
-      }, 500);
-      
-      return () => clearTimeout(timer);
+      console.log('Data already available, skipping loading state');
+      // Don't call onReloadCalls here as it can cause an infinite loop
+      // Just let the parent component know it should update its loading state
+      // on next render
     }
-  }, [calls, isLoading, onReloadCalls]);
+  }, []);
   
   // Function to navigate to call details page
   const navigateToCallDetails = (callId: string) => {
@@ -166,44 +159,29 @@ export const CommunicationTabs: React.FC<CommunicationTabsProps> = ({
       </div>
       
       <CardContent className="p-6">
-        {isLoading ? (
-          <div className="flex justify-center items-center h-40">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          </div>
-        ) : error ? (
-          <div className="text-center py-8">
-            <p className="text-red-500 mb-2">{error}</p>
-            <button
-              onClick={onReloadCalls}
-              className="text-sm text-blue-500 hover:text-blue-700"
-            >
-              Try again
-            </button>
-          </div>
-        ) : (
-          <Tabs defaultValue="conversations" className="w-full">
-            <TabsList className="mb-4 w-full grid grid-cols-3 h-auto">
-              <TabsTrigger value="conversations" className="py-2 data-[state=active]:shadow-md">
-                <div className="flex items-center gap-1">
-                  <MessageSquare className="h-4 w-4" />
-                  <span>Conversations</span>
-                  <Badge variant="secondary" className="ml-2 bg-slate-100 hover:bg-slate-100">{conversations.length}</Badge>
-                </div>
-              </TabsTrigger>
-              <TabsTrigger value="activities" className="py-2 data-[state=active]:shadow-md">
-                <div className="flex items-center gap-1">
-                  <Phone className="h-4 w-4" />
-                  <span>Activities</span>
-                  <Badge variant="secondary" className="ml-2 bg-slate-100 hover:bg-slate-100">{calls.length}</Badge>
-                </div>
-              </TabsTrigger>
-              <TabsTrigger value="emails" className="py-2 data-[state=active]:shadow-md">
-                <div className="flex items-center gap-1">
-                  <Mail className="h-4 w-4" />
-                  <span>Emails</span>
-                  <Badge variant="secondary" className="ml-2 bg-slate-100 hover:bg-slate-100">{emails.length}</Badge>
-                </div>
-              </TabsTrigger>
+        <Tabs defaultValue="conversations" className="w-full">
+          <TabsList className="mb-4 w-full grid grid-cols-3 h-auto">
+            <TabsTrigger value="conversations" className="py-2 data-[state=active]:shadow-md">
+              <div className="flex items-center gap-1">
+                <MessageSquare className="h-4 w-4" />
+                <span>Conversations</span>
+                <Badge variant="secondary" className="ml-2 bg-slate-100 hover:bg-slate-100">{conversations.length}</Badge>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger value="activities" className="py-2 data-[state=active]:shadow-md">
+              <div className="flex items-center gap-1">
+                <Phone className="h-4 w-4" />
+                <span>Calls</span>
+                <Badge variant="secondary" className="ml-2 bg-slate-100 hover:bg-slate-100">{calls.length}</Badge>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger value="emails" className="py-2 data-[state=active]:shadow-md">
+              <div className="flex items-center gap-1">
+                <Mail className="h-4 w-4" />
+                <span>Emails</span>
+                <Badge variant="secondary" className="ml-2 bg-slate-100 hover:bg-slate-100">{emails.length}</Badge>
+              </div>
+            </TabsTrigger>
             </TabsList>
 
             <TabsContent value="conversations" className="space-y-4">
@@ -474,7 +452,6 @@ export const CommunicationTabs: React.FC<CommunicationTabsProps> = ({
               )}
             </TabsContent>
           </Tabs>
-        )}
       </CardContent>
     </Card>
   );

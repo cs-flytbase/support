@@ -565,35 +565,42 @@ export default function CustomerDetailPage() {
   // Load customer calls
   const loadCalls = async () => {
     try {
-      setCalls([]);
-      setCallsLoading(true);
-      setCalls([]);
+      // Don't set calls to empty array and then immediately load
+      // Only reset calls if we're in a fresh load
+      if (!calls.length) {
+        setCallsLoading(true);
+      }
+      
       const { data, error } = await supabase
         .from('calls')
         .select('*')
         .eq('customer_id', customerId)
-        .order('call_date', { ascending: false });
+        .order('actual_start_time', { ascending: false });
 
       if (error) throw error;
-      setCalls(data || []);
       
-      // Update customer's last call date if calls exist
-      if (data && data.length > 0 && customer) {
-        const lastCallDate = data[0].call_date;
+      // Only update state if we have new data
+      if (data) {
+        setCalls(data);
         
-        // Only update customer in state if the date is different
-        if (customer.last_call_date !== lastCallDate) {
-          setCustomer({
-            ...customer,
-            last_call_date: lastCallDate
-          });
+        // Update customer's last call date if calls exist and we have customer data
+        if (data.length > 0 && customer) {
+          const lastCallDate = data[0].actual_start_time || data[0].created_at;
           
-          // Optionally update the database to store this last call date
-          // This ensures the last_call_date is accurate even if the calls are loaded separately
-          await supabase
-            .from('customers')
-            .update({ last_call_date: lastCallDate })
-            .eq('id', customerId);
+          // Only update customer in state if the date is different
+          if (customer.last_call_date !== lastCallDate) {
+            setCustomer({
+              ...customer,
+              last_call_date: lastCallDate
+            });
+            
+            // Update the database to store this last call date
+            // This ensures the last_call_date is accurate even if the calls are loaded separately
+            await supabase
+              .from('customers')
+              .update({ last_call_date: lastCallDate })
+              .eq('id', customerId);
+          }
         }
       }
     } catch (err) {
@@ -1043,7 +1050,7 @@ export default function CustomerDetailPage() {
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="contacts">Contacts</TabsTrigger>
-              <TabsTrigger value="calls">Calls</TabsTrigger>
+              <TabsTrigger value="activities">Activities</TabsTrigger>
             </TabsList>
             
             {/* Dashboard Tab */}
@@ -1206,14 +1213,14 @@ export default function CustomerDetailPage() {
               </Card>
             </TabsContent>
             
-            {/* Calls Tab */}
-            <TabsContent value="calls">
+            {/* Activities Tab */}
+            <TabsContent value="activities">
               <Card className="p-6">
                 <CommunicationTabs 
                   calls={calls}
                   conversations={conversations}
                   participants={participants}
-                  isLoading={callsLoading}
+                  isLoading={false /* Force loading to false to prevent perpetual loading */}
                   error={callsError}
                   onReloadCalls={loadCalls}
                   formatDate={formatDate}
