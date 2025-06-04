@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { X, Mail, User, Building, Clock, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
 
 // Define the Email type
 type Email = {
@@ -114,8 +115,13 @@ export default function EmailDetailPage() {
   const getSentimentBadge = (sentiment: number | null) => {
     if (sentiment === null) return 'Unknown';
     
-    if (sentiment >= 70) return 'Positive';
-    if (sentiment >= 40) return 'Neutral';
+    if (sentiment > 0.60) {
+      return <Badge variant="outline" className="bg-green-100 text-green-800">Positive</Badge>;
+    } else if (sentiment >= 0.40) {
+      return <Badge variant="outline" className="bg-blue-100 text-blue-800">Neutral</Badge>;
+    } else {
+      return <Badge variant="outline" className="bg-red-100 text-red-800">Negative</Badge>;
+    }
     return 'Negative';
   };
   
@@ -209,7 +215,7 @@ export default function EmailDetailPage() {
               
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-medium text-gray-500">Sentiment:</h3>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSentimentColorClass(email.sentiment)}`}>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium `}>
                   {getSentimentBadge(email.sentiment)}
                 </span>
               </div>

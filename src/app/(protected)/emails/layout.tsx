@@ -154,29 +154,35 @@ export default function EmailsLayout({ children }: { children: React.ReactNode }
       return <Badge variant="outline" className="bg-gray-100 text-gray-800">Unknown</Badge>;
     }
     
-    if (sentiment >= 70) {
+    if (sentiment > 0.60) {
       return <Badge variant="outline" className="bg-green-100 text-green-800">Positive</Badge>;
-    }
-    
-    if (sentiment >= 40) {
+    } else if (sentiment >= 0.40) {
       return <Badge variant="outline" className="bg-blue-100 text-blue-800">Neutral</Badge>;
+    } else {
+      return <Badge variant="outline" className="bg-red-100 text-red-800">Negative</Badge>;
     }
-    
-    return <Badge variant="outline" className="bg-red-100 text-red-800">Negative</Badge>;
   };
   
   // Filter and sort emails
   const filteredAndSortedEmails = useMemo(() => {
     return [...emails]
       .filter(email => {
+        const sentimentValue = email.sentiment || 0;
+        let matchesSentiment = true;
+        
         // Apply sentiment filter
         if (sentimentFilter !== 'all') {
-          const sentimentValue = email.sentiment || 0;
-          
-          if (sentimentFilter === 'positive' && sentimentValue < 70) return false;
-          if (sentimentFilter === 'neutral' && (sentimentValue < 40 || sentimentValue >= 70)) return false;
-          if (sentimentFilter === 'negative' && sentimentValue >= 40) return false;
+          if (sentimentFilter === 'positive') {
+            matchesSentiment = sentimentValue > 60;
+          } else if (sentimentFilter === 'neutral') {
+            matchesSentiment = sentimentValue >= 40 && sentimentValue <= 60;
+          } else if (sentimentFilter === 'negative') {
+            matchesSentiment = sentimentValue < 40;
+          }
         }
+        
+        // If it doesn't match sentiment filter, return false immediately
+        if (!matchesSentiment) return false;
         
         // Apply search filter
         if (searchTerm) {
