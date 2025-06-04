@@ -170,14 +170,14 @@ export default function EmailsLayout({ children }: { children: React.ReactNode }
         const sentimentValue = email.sentiment || 0;
         let matchesSentiment = true;
         
-        // Apply sentiment filter
+        // Apply sentiment filter (fixed for float thresholds)
         if (sentimentFilter !== 'all') {
           if (sentimentFilter === 'positive') {
-            matchesSentiment = sentimentValue > 60;
+            matchesSentiment = sentimentValue > 0.60;
           } else if (sentimentFilter === 'neutral') {
-            matchesSentiment = sentimentValue >= 40 && sentimentValue <= 60;
+            matchesSentiment = sentimentValue >= 0.40 && sentimentValue <= 0.60;
           } else if (sentimentFilter === 'negative') {
-            matchesSentiment = sentimentValue < 40;
+            matchesSentiment = sentimentValue < 0.40;
           }
         }
         

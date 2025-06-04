@@ -138,16 +138,33 @@ export default function EmailDetailPage() {
     router.push('/emails');
   };
   
+  // Handler for overlay click to close if clicked outside modal
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    if (e.target === e.currentTarget) {
+      handleClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 flex justify-end">
-      <div className="bg-white w-full max-w-md p-6 overflow-y-auto h-full shadow-xl">
-        <div className="flex justify-between items-center mb-6">
+    <div
+      className="fixed inset-0 z-50 bg-black/30 flex justify-end"
+      onClick={handleOverlayClick}
+      role="presentation"
+    >
+      <div
+        className="bg-white w-full max-w-md h-full shadow-xl flex flex-col"
+        onClick={e => e.stopPropagation()} // Prevent overlay click from propagating
+      >
+        {/* Sticky header */}
+        <div className="flex justify-between items-center sticky top-0 z-20 bg-white px-6 py-4 border-b">
           <Button variant="ghost" size="icon" onClick={handleClose} className="-ml-2">
             <X className="h-5 w-5" />
           </Button>
           <h2 className="text-2xl font-semibold">Email Details</h2>
           <div className="w-8"></div> {/* Spacer for alignment */}
         </div>
+        {/* Scrollable content below sticky header */}
+        <div className="flex-1 overflow-y-auto px-6 pb-6 pt-2">
         
         {isLoading ? (
           <div className="space-y-4 animate-pulse">
@@ -259,6 +276,7 @@ export default function EmailDetailPage() {
             <Button onClick={handleClose} className="mt-4">Go Back</Button>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
