@@ -1067,7 +1067,7 @@ export default function CustomerDetailPage() {
                     plan={'Enterprise'}
                     lifecycleStage={'Adoption'}
                     renewalDate={'Due in 90 days'} 
-                    healthScore={75}
+                    callSentimentScore={customer.call_sentiment_score || 0.6}
                     engagementData={{
                       emails: Array(6).fill(0).map((_, i) => ({ label: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'][i], value: Math.floor(Math.random() * 30) })),
                       calls: Array(6).fill(0).map((_, i) => ({ label: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'][i], value: calls.filter(c => {

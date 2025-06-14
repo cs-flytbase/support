@@ -18,7 +18,7 @@ interface CustomerDashboardProps {
   plan: string;
   lifecycleStage: string;
   renewalDate: string;
-  healthScore: number;
+  callSentimentScore: number;
   engagementData: {
     emails: { label: string; value: number }[];
     calls: { label: string; value: number }[];
@@ -47,7 +47,7 @@ export function CustomerDashboard({
   plan,
   lifecycleStage,
   renewalDate,
-  healthScore,
+  callSentimentScore,
   engagementData,
   sentimentData,
   supportIssues,
@@ -57,7 +57,7 @@ export function CustomerDashboard({
   // Calculate sentiment percentages
   const totalSentiment = sentimentData.calls + sentimentData.conversations + sentimentData.emails;
   const getPercentage = (value: number) => Math.round((value / totalSentiment) * 100);
-  
+  // console.log("callSentimentScore", callSentimentScore);
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -70,16 +70,21 @@ export function CustomerDashboard({
           formatDate={formatDate}
         />
 
-        {/* Health Score Card */}
+        {/* Call Sentiment Score Card */}
         <Card className="md:col-span-1">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Health Score</CardTitle>
+            <CardTitle className="text-lg font-medium">Call Sentiment Score</CardTitle>
           </CardHeader>
-          <CardContent className="flex justify-center">
+          <CardContent className="flex flex-col items-center space-y-2">
+            {/* Debug info - showing raw value */}
+            <div className="text-xs text-muted-foreground">
+              {/* Raw: {JSON.stringify(callSentimentScore)} */}
+            </div>
+            
             <ProgressCircle 
-              value={healthScore} 
+              value={callSentimentScore ? Math.round(callSentimentScore * 100) : 0} 
               size="lg" 
-              strokeClassName={healthScore > 75 ? "text-green-500" : healthScore > 50 ? "text-yellow-500" : "text-red-500"}
+              strokeClassName={callSentimentScore > 0.75 ? "text-green-500" : callSentimentScore > 0.5 ? "text-yellow-500" : "text-red-500"}
               valueClassName="text-3xl font-bold"
             />
           </CardContent>
@@ -145,15 +150,19 @@ export function CustomerDashboard({
               valuePrefix=""
               valueSuffix={`% (${sentimentData.conversations})`}
             />
-            <ProgressBar 
-              value={sentimentData.emails} 
-              max={totalSentiment} 
-              label="Emails" 
-              showValue={true}
-              indicatorClassName="bg-purple-500"
-              valuePrefix=""
-              valueSuffix={`% (${sentimentData.emails})`}
-            />
+            <div className="flex justify-between items-center">
+              <span>Emails</span>
+              <div>
+                {/* Display email sentiment as a badge like in email detail page */}
+                {sentimentData.emails > 0.60 ? (
+                  <Badge variant="outline" className="bg-green-100 text-green-800">Positive</Badge>
+                ) : sentimentData.emails >= 0.40 ? (
+                  <Badge variant="outline" className="bg-blue-100 text-blue-800">Neutral</Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-red-100 text-red-800">Negative</Badge>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
 

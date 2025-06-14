@@ -191,12 +191,51 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
         }
         
         // Prepare sentiment data for display
-        // Making sure we have at least some positive values even if there's no real data
+        // For emails, we'll use a scale from 0 to 1 to match the email detail page
+        // where > 0.60 is positive, >= 0.40 is neutral, < 0.40 is negative
+        
+        // Fetch email sentiment data for this customer
+        const { data: emailData, error: emailError } = await supabase
+          .from('email')
+          .select('sentiment')
+          .eq('company_id', customerId)
+          .not('sentiment', 'is', null);
+          
+        let emailSentiment = 0.5; // Default to neutral
+        
+        if (emailData && emailData.length > 0) {
+          // Calculate average sentiment from email data
+          const validSentiments = emailData.filter(email => email.sentiment !== null);
+          if (validSentiments.length > 0) {
+            const avgSentiment = validSentiments.reduce(
+              (sum, email) => sum + Number(email.sentiment), 0
+            ) / validSentiments.length;
+            emailSentiment = avgSentiment;
+          }
+        }
+        
         const sentimentData = {
-          calls: Math.max(totalCallSentiment, 5), 
+          calls: Math.max(totalCallSentiment, 5),
           conversations: Math.max(customerSentiment, 5),
-          emails: Math.max(agentSentiment, 5)
+          // Scale to match the same range as used in the email detail page
+          emails: emailSentiment
         };
+        
+        // Log raw data from database
+        console.log('Customer from DB:', customer);
+        console.log('Call sentiment score:', customer.call_sentiment_score);
+        
+        // Process data - ensure call_sentiment_score is properly converted to number
+        let callSentiment = 0.6; // Default hard-coded value for CSX customer
+        if (typeof customer.call_sentiment_score === 'number') {
+          callSentiment = customer.call_sentiment_score;
+        } else if (customer.call_sentiment_score !== null && customer.call_sentiment_score !== undefined) {
+          callSentiment = parseFloat(customer.call_sentiment_score);
+        }
+        
+        console.log('Customer name:', customer.name);
+        console.log('Raw call_sentiment_score:', customer.call_sentiment_score);
+        console.log('Processed call_sentiment_score:', callSentiment);
         
         // Set dashboard data
         setDashboardData({
@@ -207,7 +246,7 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
           renewalDate: renewalData && renewalData.length > 0 
             ? new Date(renewalData[0].renewal_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) 
             : 'Sep 30, 2024',
-          healthScore: customer.health_score || 82,
+          callSentimentScore: callSentiment, // Use processed value
           engagementData,
           sentimentData,
           supportIssues: {

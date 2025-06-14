@@ -430,12 +430,12 @@ export const CommunicationTabs: React.FC<CommunicationTabsProps> = ({
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <Badge className={
-                              email.sentiment && email.sentiment > 70 ? 'bg-green-50 text-green-700 hover:bg-green-50 border-green-100' :
-                              email.sentiment && email.sentiment < 30 ? 'bg-red-50 text-red-700 hover:bg-red-50 border-red-100' :
-                              'bg-yellow-50 text-yellow-700 hover:bg-yellow-50 border-yellow-100'
+                              email.sentiment && email.sentiment > 0.60 ? 'bg-green-50 text-green-700 hover:bg-green-50 border-green-100' :
+                              email.sentiment && email.sentiment >= 0.40 ? 'bg-blue-50 text-blue-800 hover:bg-blue-50 border-blue-100' :
+                              'bg-red-50 text-red-700 hover:bg-red-50 border-red-100'
                             }>
-                              {email.sentiment && email.sentiment > 70 ? 'Positive' :
-                               email.sentiment && email.sentiment < 30 ? 'Negative' : 'Neutral'}
+                              {email.sentiment && email.sentiment > 0.60 ? 'Positive' :
+                               email.sentiment && email.sentiment >= 0.40 ? 'Neutral' : 'Negative'}
                             </Badge>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">

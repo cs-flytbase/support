@@ -13,6 +13,8 @@ export interface CustomerDetails {
   updated_at: string;
   last_call_date?: string | null;
   primary_contact_id?: string | null;
+  health_score?: number | null;
+  call_sentiment_score?: number | null;
 }
 
 export interface OrgDetails {
