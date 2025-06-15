@@ -233,6 +233,26 @@ export default function CallDetailPage() {
       
       if (customerError) throw customerError;
       
+      // IMPORTANT: Also update related issue_call_mentions to maintain data consistency
+      const { data: mentionsData, error: mentionsQueryError } = await supabase
+        .from('issue_call_mentions')
+        .select('id')
+        .eq('call_id', call.id);
+        
+      if (mentionsQueryError) throw mentionsQueryError;
+      
+      if (mentionsData && mentionsData.length > 0) {
+        // Update all related issue_call_mentions with the new customer_id
+        const { error: mentionsUpdateError } = await supabase
+          .from('issue_call_mentions')
+          .update({ customer_id: selectedCustomerId })
+          .eq('call_id', call.id);
+          
+        if (mentionsUpdateError) throw mentionsUpdateError;
+        
+        toast.success(`Updated ${mentionsData.length} related issue references`);
+      }
+      
       // Update local state
       setCall({
         ...call,

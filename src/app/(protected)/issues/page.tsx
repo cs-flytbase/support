@@ -241,29 +241,42 @@ export default function IssuesPage() {
       if (issuesError) throw issuesError;
       
       if (issuesData && issuesData.length > 0) {
+        // Create maps to track multiple customers and calls per issue
+        const issueCustomersMap = new Map<string, Set<string>>();
+        const issueCallsMap = new Map<string, Set<string>>();
+        
+        // Initialize maps with issues
+        issuesData.forEach(issue => {
+          issueCustomersMap.set(issue.id, new Set());
+          issueCallsMap.set(issue.id, new Set());
+          
+          // Add the original customer if it exists
+          if (issue.created_by_customer_id) {
+            const customerSet = issueCustomersMap.get(issue.id);
+            if (customerSet) customerSet.add(issue.created_by_customer_id);
+          }
+        });
+        
         // Get all unique customer IDs from issues
-        const customerIds = [...new Set(
+        let customerIds = [...new Set(
           issuesData.map(issue => issue.created_by_customer_id).filter(Boolean)
         )];
         
-        // Also fetch issue call mentions to get customer IDs from calls
+        // Fetch issue call mentions to get call IDs
         const { data: callMentionsData, error: callMentionsError } = await supabase
           .from('issue_call_mentions')
-          .select('issue_id, customer_id, call_id')
+          .select('issue_id, call_id')
           .in('issue_id', issuesData.map(issue => issue.id));
         
         if (callMentionsError) throw callMentionsError;
         
-        // If we have call mentions, add their customer IDs to our list
+        // If we have call mentions, get customer IDs from the associated calls
         if (callMentionsData && callMentionsData.length > 0) {
-          const callMentionCustomerIds = callMentionsData
-            .map(mention => mention.customer_id)
-            .filter(Boolean);
-            
-          // Also get customer IDs from calls
+          // Get all unique call IDs from mentions
           const callIds = [...new Set(callMentionsData.map(mention => mention.call_id).filter(Boolean))];
           
           if (callIds.length > 0) {
+            // Fetch customer IDs from calls
             const { data: callsData, error: callsError } = await supabase
               .from('calls')
               .select('id, customer_id')
@@ -274,23 +287,35 @@ export default function IssuesPage() {
             if (callsData && callsData.length > 0) {
               const callCustomerIds = callsData.map(call => call.customer_id).filter(Boolean);
               // Add call customer IDs to our list
-              customerIds.push(...callCustomerIds);
+              customerIds = [...new Set([...customerIds, ...callCustomerIds])];
+              
+              // Add call mentions to the call maps
+              callMentionsData.forEach(mention => {
+                // Track calls for each issue
+                if (mention.call_id && issueCallsMap.has(mention.issue_id)) {
+                  const callSet = issueCallsMap.get(mention.issue_id);
+                  if (callSet) callSet.add(mention.call_id);
+                }
+              
+                // Add customer IDs from calls to the corresponding issues
+                if (mention.call_id && mention.issue_id) {
+                  const matchingCall = callsData.find(c => c.id === mention.call_id);
+                  if (matchingCall?.customer_id && issueCustomersMap.has(mention.issue_id)) {
+                    const customerSet = issueCustomersMap.get(mention.issue_id);
+                    if (customerSet) customerSet.add(matchingCall.customer_id);
+                  }
+                }
+              });
             }
           }
-          
-          // Add call mention customer IDs to our list
-          customerIds.push(...callMentionCustomerIds);
         }
         
-        // Remove duplicates
-        const uniqueCustomerIds = [...new Set(customerIds)];
-        
         // If we have customer IDs, fetch customer details
-        if (uniqueCustomerIds.length > 0) {
+        if (customerIds.length > 0) {
           const { data: customerData, error: customerError } = await supabase
             .from('customers')
             .select('id, name')
-            .in('id', uniqueCustomerIds);
+            .in('id', customerIds);
             
           if (customerError) throw customerError;
           
@@ -298,32 +323,6 @@ export default function IssuesPage() {
           const customerMap = new Map();
           (customerData || []).forEach(customer => {
             customerMap.set(customer.id, customer.name);
-          });
-          
-          // Create maps to track multiple customers and calls per issue
-          const issueCustomersMap = new Map();
-          const issueCallsMap = new Map();
-          
-          // Initialize maps with issues
-          issuesData.forEach(issue => {
-            issueCustomersMap.set(issue.id, new Set());
-            issueCallsMap.set(issue.id, new Set());
-            
-            // Add the original customer if it exists
-            if (issue.created_by_customer_id) {
-              issueCustomersMap.get(issue.id).add(issue.created_by_customer_id);
-            }
-          });
-          
-          // Add customers and calls from call mentions
-          (callMentionsData || []).forEach(mention => {
-            if (mention.customer_id && issueCustomersMap.has(mention.issue_id)) {
-              issueCustomersMap.get(mention.issue_id).add(mention.customer_id);
-            }
-            
-            if (mention.call_id && issueCallsMap.has(mention.issue_id)) {
-              issueCallsMap.get(mention.issue_id).add(mention.call_id);
-            }
           });
           
           // Add customer names to issues with counts
@@ -335,7 +334,7 @@ export default function IssuesPage() {
             const primaryCustomerName = customerNames.length > 0 ? customerNames[0] : 'Unknown';
             
             // Count calls for this issue
-            const callsCount = issueCallsMap.get(issue.id)?.size || 0;
+            const callsCount = issueCallsMap.get(issue.id)?.size ?? 0;
             
             return {
               ...issue,
@@ -458,40 +457,48 @@ export default function IssuesPage() {
     loadCustomers();
   }, []);
   
-  // Filter issues based on search term, customer, status, and time
+  // Filter issues based on search and filters
   const filteredIssues = useMemo(() => {
     return issues.filter(issue => {
-      // Apply search term filter
-      const searchMatch = !searchTerm || 
-        issue.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (issue.description && issue.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      // Search term filter - expanded to search in customer names array
+      const matchesSearch = searchTerm === '' || 
+        issue.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        issue.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        issue.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (issue.customer_names && issue.customer_names.some(name => 
+          name.toLowerCase().includes(searchTerm.toLowerCase())));
       
-      // Apply customer filter
-      const customerMatch = customerFilter === 'all' || issue.created_by_customer_id === customerFilter;
+      // Customer filter - check against all possible customer names/ids
+      const matchesCustomer = customerFilter === 'all' || 
+        (issue.created_by_customer_id === customerFilter) || 
+        (issue.customer_names?.includes(customers.find(c => c.id === customerFilter)?.name || ''));
       
-      // Apply status filter
-      const statusMatch = statusFilter === 'all' || issue.status === statusFilter;
+      // Status filter
+      const matchesStatus = statusFilter === 'all' || issue.status === statusFilter;
       
-      // Apply time filter
-      let timeMatch = true;
-      const now = new Date();
-      const issueDate = new Date(issue.created_at);
-      
-      if (timeFilter === 'today') {
-        timeMatch = issueDate.toDateString() === now.toDateString();
-      } else if (timeFilter === 'week') {
-        const weekAgo = new Date(now);
-        weekAgo.setDate(now.getDate() - 7);
-        timeMatch = issueDate >= weekAgo;
-      } else if (timeFilter === 'month') {
-        const monthAgo = new Date(now);
-        monthAgo.setMonth(now.getMonth() - 1);
-        timeMatch = issueDate >= monthAgo;
+      // Time filter
+      let matchesTime = true;
+      if (timeFilter !== 'all') {
+        const issueDate = new Date(issue.created_at).getTime();
+        const now = new Date().getTime();
+        const dayInMs = 24 * 60 * 60 * 1000;
+        
+        switch (timeFilter) {
+          case 'today':
+            matchesTime = now - issueDate < dayInMs;
+            break;
+          case 'week':
+            matchesTime = now - issueDate < 7 * dayInMs;
+            break;
+          case 'month':
+            matchesTime = now - issueDate < 30 * dayInMs;
+            break;
+        }
       }
       
-      return searchMatch && customerMatch && statusMatch && timeMatch;
+      return matchesSearch && matchesCustomer && matchesStatus && matchesTime;
     });
-  }, [issues, searchTerm, customerFilter, statusFilter, timeFilter]);
+  }, [issues, searchTerm, customerFilter, statusFilter, timeFilter, customers]);
 
   // Function to get customer name by ID
   const getCustomerName = (customerId: string | null) => {
@@ -667,10 +674,9 @@ export default function IssuesPage() {
                   <tr 
                     key={issue.id} 
                     className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => router.push(`/issues/${issue.id}`)}
                   >
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">{issue.title}</div>
+                    <td className="px-6 py-4" onClick={() => router.push(`/issues/${issue.id}`)}>
+                      <div className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">{issue.title}</div>
                       {issue.description && (
                         <div className="text-sm text-gray-500 truncate max-w-xs">
                           {issue.description.length > 100 ? 
@@ -723,13 +729,13 @@ export default function IssuesPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       {deleteConfirmId === issue.id ? (
                         <div className="flex items-center justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-gray-700">Confirm delete?</span>
+                          <span className="text-gray-700 font-medium">Confirm delete?</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteIssue(issue.id);
                             }}
-                            className="text-red-600 hover:text-red-900"
+                            className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-md text-xs"
                           >
                             Yes
                           </button>
@@ -738,7 +744,7 @@ export default function IssuesPage() {
                               e.stopPropagation();
                               setDeleteConfirmId(null);
                             }}
-                            className="text-gray-600 hover:text-gray-900"
+                            className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-2 py-1 rounded-md text-xs"
                           >
                             No
                           </button>
@@ -748,10 +754,19 @@ export default function IssuesPage() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              router.push(`/issues/${issue.id}`);
+                            }}
+                            className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded-md text-xs"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setEditingIssue(issue);
                               setShowForm(false);
                             }}
-                            className="text-blue-600 hover:text-blue-900"
+                            className="bg-green-100 hover:bg-green-200 text-green-800 px-2 py-1 rounded-md text-xs"
                           >
                             Edit
                           </button>
@@ -760,7 +775,7 @@ export default function IssuesPage() {
                               e.stopPropagation();
                               setDeleteConfirmId(issue.id);
                             }}
-                            className="text-red-600 hover:text-red-900"
+                            className="bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded-md text-xs"
                           >
                             Delete
                           </button>

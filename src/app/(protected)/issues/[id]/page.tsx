@@ -167,8 +167,11 @@ export default function IssueDetailPage({ params }: PageProps) {
           
           if (callsError) throw callsError;
           
-          // Get customer info for calls
-          const callCustomerIds = [...new Set((callsData || []).map(call => call.customer_id).filter(Boolean))];
+          // Get all unique customer IDs from calls only (since issue_call_mentions no longer has customer_id)
+          const callCustomerIds = (callsData || [])
+            .map(call => call.customer_id)
+            .filter(Boolean);
+          
           let callCustomers: any[] = [];
           
           if (callCustomerIds.length > 0) {
@@ -182,10 +185,15 @@ export default function IssueDetailPage({ params }: PageProps) {
           }
           
           // Combine call mention data with call details and customer names
+          // Get customer info ONLY from calls since issue_call_mentions.customer_id no longer exists
           const enrichedCallMentions = callMentionsRaw.map(mention => {
             const call = callsData?.find(c => c.id === mention.call_id);
-            const customer = call?.customer_id ? callCustomers.find(c => c.id === call.customer_id) : 
-                             (mention.customer_id ? callCustomers.find(c => c.id === mention.customer_id) : null);
+            
+            // Get customer from the call
+            let customer = null;
+            if (call?.customer_id) {
+              customer = callCustomers.find(c => c.id === call.customer_id);
+            }
             
             return {
               ...mention,

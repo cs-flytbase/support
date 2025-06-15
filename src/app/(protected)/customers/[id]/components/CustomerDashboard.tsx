@@ -6,7 +6,8 @@ import { ProgressCircle } from '@/components/ui/progress-circle';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { LineChart } from '@/components/ui/line-chart';
 import { CustomerInfoCard } from './CustomerInfoCard';
-import { CustomerDetails, CustomerContact } from '../types';
+import { CommunicationTabs } from './CommunicationTabs';
+import { CustomerDetails, CustomerContact, Call, Conversation, Participant } from '../types';
 
 interface CustomerDashboardProps {
   customer: CustomerDetails;
@@ -33,7 +34,12 @@ interface CustomerDashboardProps {
     open: number;
     closed: number;
   };
-  recentActivity: string;
+  calls: Call[];
+  conversations: Conversation[];
+  participants: Record<string, Participant[]>;
+  callsError: string | null;
+  formatDuration: (seconds: number | null) => string;
+  onReloadCalls: () => Promise<void>;
   assignedAgent?: string;
 }
 
@@ -51,7 +57,12 @@ export function CustomerDashboard({
   engagementData,
   sentimentData,
   supportIssues,
-  recentActivity,
+  calls,
+  conversations,
+  participants,
+  callsError,
+  onReloadCalls,
+  formatDuration,
   assignedAgent
 }: CustomerDashboardProps) {
   // Calculate sentiment percentages
@@ -93,21 +104,25 @@ export function CustomerDashboard({
         {/* Lifecycle Stage and Renewal Card */}
         <Card className="md:col-span-1">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Lifecycle Stage</CardTitle>
+            <CardTitle className="text-lg font-medium">USAGE DATA</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <p className="text-2xl font-bold">{lifecycleStage}</p>
+            {/* <p className="text-2xl font-bold">{lifecycleStage}</p>
             
             <div>
               <p className="text-lg font-medium">Renewal Date</p>
               <p className="text-2xl font-bold">{renewalDate}</p>
-            </div>
+            </div> */}
+            <div className='flex items-center justify-center '>
+              <p className="text-lg font-medium text-red-600">connect org_id to get the usage data </p>
+              <p className="text-2xl font-bold"></p>
+            </div> 
           </CardContent>
         </Card>
       </div>
 
       {/* Engagement Metrics Chart */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle>Engagement Metrics</CardTitle>
           <CardDescription>Activity over the last 6 months</CardDescription>
@@ -123,11 +138,11 @@ export function CustomerDashboard({
             ]}
           />
         </CardContent>
-      </Card>
+      </Card> */}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Sentiment Analysis Card */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle>Communication Sentiment</CardTitle>
           </CardHeader>
@@ -153,7 +168,7 @@ export function CustomerDashboard({
             <div className="flex justify-between items-center">
               <span>Emails</span>
               <div>
-                {/* Display email sentiment as a badge like in email detail page */}
+               
                 {sentimentData.emails > 0.60 ? (
                   <Badge variant="outline" className="bg-green-100 text-green-800">Positive</Badge>
                 ) : sentimentData.emails >= 0.40 ? (
@@ -164,10 +179,10 @@ export function CustomerDashboard({
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Support Issues Card */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle>Support Issue Analysis</CardTitle>
           </CardHeader>
@@ -184,18 +199,23 @@ export function CustomerDashboard({
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
-      {/* Recent Activity Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="whitespace-pre-line">{recentActivity}</p>
-        </CardContent>
-      </Card>
+      {/* Communication Tabs */}
+     
+          <CommunicationTabs 
+            calls={calls}
+            conversations={conversations}
+            participants={participants}
+            isLoading={false /* Force loading to false to prevent perpetual loading */}
+            error={callsError}
+            onReloadCalls={onReloadCalls}
+            formatDate={formatDate}
+            formatDuration={formatDuration}
+          />
+        
+     
     </div>
   );
 }

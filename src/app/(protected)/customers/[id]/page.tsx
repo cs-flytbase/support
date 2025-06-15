@@ -1087,7 +1087,12 @@ export default function CustomerDetailPage() {
                       open: 3, 
                       closed: 7 
                     }}
-                    recentActivity={customer.last_call_date ? `Last call: ${formatDate(customer.last_call_date)}` : "No recent activity recorded"}
+                    calls={calls}
+                    conversations={conversations}
+                    participants={participants}
+                    callsError={callsError}
+                    onReloadCalls={loadCalls}
+                    formatDuration={formatDuration}
                     assignedAgent={undefined}
                   />
                 )}

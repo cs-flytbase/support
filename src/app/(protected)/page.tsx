@@ -6,7 +6,7 @@ import { useEffect } from "react";
 export default function Home() {
   const router = useRouter()
   useEffect(() => {
-    router.push('/conversations')
+    router.push('/calls')
   }, [])
   return (
     <div className="h-full w-full flex items-center justify-center">
