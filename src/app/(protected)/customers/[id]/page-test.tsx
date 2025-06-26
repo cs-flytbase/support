@@ -276,7 +276,7 @@ export default function CustomerDetailPage() {
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('id, name, email, website, phone, address, customer_type, industry, customer_profile, customer_profile_update_time, created_at, updated_at')
+        .select('id, name, email, website, phone, address, country, region, customer_type, industry, customer_profile, customer_profile_update_time, created_at, updated_at')
         .order('name', { ascending: true });
       
       if (error) throw error;
@@ -1051,7 +1051,8 @@ export default function CustomerDetailPage() {
               {/* Customer Name & Location */}
               <div>
                 <div className="font-bold text-lg">{customer.name}</div>
-                <div className="text-gray-500 text-sm">{customer.country || customer.address || 'Location N/A'}</div>
+                <div className="text-gray-500 text-sm">{customer.country || 'Location N/A'}</div>
+                <div className="text-gray-500 text-sm">{customer.region || 'Location N/A'}</div>
               </div>
               {/* Stakeholder Matrix */}
               <div>
@@ -1068,7 +1069,13 @@ export default function CustomerDetailPage() {
                 <span className="font-semibold text-sm mb-1">Overall Sentiment</span>
                 <span className="text-2xl">
                   {/* Emoji based on sentiment score */}
-                  {customer.call_sentiment_score && customer.call_sentiment_score > 0.7 ? '😊' : customer.call_sentiment_score > 0.4 ? '😐' : '😞'}
+                  {customer.call_sentiment_score == null
+  ? '❓'
+  : customer.call_sentiment_score > 0.7
+    ? '😊'
+    : customer.call_sentiment_score > 0.4
+      ? '😐'
+      : '😞'}
                 </span>
                 <span className="text-xs text-gray-500">{customer.call_sentiment_score == null ? 'No sentiment available' : customer.call_sentiment_score > 0.7 ? 'Happy' : customer.call_sentiment_score > 0.4 ? 'Neutral' : 'Unhappy'}</span>
               </div>

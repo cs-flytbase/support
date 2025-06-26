@@ -1,10 +1,13 @@
 export interface CustomerDetails {
+  partner_org_id?: string | null;
   id: string;
   name: string;
   email: string | null;
   website: string | null;
   phone: string | null;
   address: string | null;
+  country: string | null;
+  region: string | null;
   customer_type: string | null;
   industry: string | null;
   customer_profile: string | null;
@@ -15,6 +18,11 @@ export interface CustomerDetails {
   primary_contact_id?: string | null;
   health_score?: number | null;
   call_sentiment_score?: number | null;
+  // Business Development Fields
+  closed_won?: number | null;
+  Contracted?: number | null;
+  totalPipelineAmount?: number | null;
+  "Weighted Pipeline"?: number | null;
 }
 
 export interface OrgDetails {
@@ -105,4 +113,24 @@ export interface Agent {
   role: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Deal {
+  id: string;
+  name: string;
+  stage: string;
+  closureDate: string;
+  amount?: number | null;
+  currency?: string | null;
+  status?: string | null;
+  pipeline?: string | null;
+  dealType?: string | null;
+  forecastAmount?: number | null;
+  projectedAmount?: number | null;
+  probability?: number | null;
+  isClosed?: boolean | null;
+  isClosedWon?: boolean | null;
+  isClosedLost?: boolean | null;
+  priority?: string | null;
+  relationshipType?: string | null;
 }

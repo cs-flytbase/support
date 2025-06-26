@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { SummarySection } from './components/SummarySection';
 import { BusinessDevSection } from './components/BusinessDevSection';
 import { ImmediateNextStepsSection } from './components/ImmediateNextStepsSection';
+import { useFCSummary } from './fc-summary';
 
 // Import types
 import { 
@@ -30,7 +31,8 @@ import {
   Call, 
   Participant,
   CustomerGoal,
-  KeyDeliverable
+  KeyDeliverable,
+  Deal
 } from "./types";
 
 // Utility function to format dates consistently
@@ -51,6 +53,8 @@ const formatDuration = (seconds: number): string => {
 };
 
 export default function CustomerDetailPage() {
+  // ...existing hooks and state
+
   const supabase = createClient();
   const router = useRouter();
   const params = useParams();
@@ -77,6 +81,41 @@ export default function CustomerDetailPage() {
   const [deliverables, setDeliverables] = useState<KeyDeliverable[]>([]);
   const [deliverablesLoading, setDeliverablesLoading] = useState(true);
   const [deliverablesError, setDeliverablesError] = useState<string | null>(null);
+
+  // Deals state
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [dealsLoading, setDealsLoading] = useState(true);
+  const [dealsError, setDealsError] = useState<string | null>(null);
+
+  // FC Summary hook and section (must be after all hooks)
+  const partnerOrgId = customer?.partner_org_id;
+  const { data: fcSummary, loading: fcLoading, error: fcError } = useFCSummary(partnerOrgId);
+  let fcSummarySection = null;
+  if (partnerOrgId) {
+    if (fcLoading) {
+      fcSummarySection = <div className="p-4">Loading FC summary...</div>;
+    } else if (fcError || !fcSummary) {
+      fcSummarySection = <div className="p-4 text-red-500">Failed to load FC summary.</div>;
+    } else {
+      fcSummarySection = (
+        <SummarySection
+          fcRemaining={fcSummary.fcRemaining}
+          fcBought={fcSummary.fcBought}
+          fcConsumed={fcSummary.fcConsumed}
+          fcConsumedMTD={fcSummary.fcConsumedMTD}
+          fcConsumedYTD={fcSummary.fcConsumedYTD}
+          strategicCustomers={[
+            { name: 'Customer 1', docks: 5, arr: 5999 },
+            { name: 'Customer 2', docks: 3, arr: 3999 },
+            { name: 'Customer 3', docks: 0, arr: 0 },
+            { name: 'Customer 4', docks: 0, arr: 0 },
+          ]}
+          growthEnablers={['Feature requests', 'Technical blockers', 'Support required']}
+        />
+      );
+    }
+  }
+
   
   // Profile updating state
   const [profileSaving, setProfileSaving] = useState(false);
@@ -122,7 +161,10 @@ export default function CustomerDetailPage() {
   // State for available companies
   const [availableCompanies, setAvailableCompanies] = useState<CustomerDetails[]>([]);
   
-  // Customer edit modal state
+  // Deals state for the customer
+  const [customerDeals, setCustomerDeals] = useState<Array<{name: string, stage: string, closureDate: string, amount: number}>>([]);
+
+  // Customer edit state
   const [showCustomerEditModal, setShowCustomerEditModal] = useState(false);
   const [customerEditData, setCustomerEditData] = useState<Partial<CustomerDetails>>({
     name: '',
@@ -278,7 +320,7 @@ export default function CustomerDetailPage() {
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('id, name, email, website, phone, address, customer_type, industry, customer_profile, customer_profile_update_time, created_at, updated_at')
+        .select('id, name, email, website, phone, address, country, region, customer_type, industry, customer_profile, customer_profile_update_time, created_at, updated_at')
         .order('name', { ascending: true });
       
       if (error) throw error;
@@ -298,10 +340,19 @@ export default function CustomerDetailPage() {
     await loadAvailableCompanies();
     
     try {
-      // Fetch customer details
+      // Fetch customer details - explicitly include all fields we need including business development metrics
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
-        .select('*')
+        .select(`
+          id, name, email, phone, website, address, country, region, 
+          partner_org_id, customer_type, industry, primary_contact_id, 
+          customer_profile, customer_profile_update_time, 
+          call_sentiment_score, created_at, updated_at,
+          closed_won, 
+          Contracted, 
+          totalPipelineAmount, 
+          Weighted_Pipeline
+        `)
         .eq('id', customerId)
         .single();
       
@@ -309,61 +360,6 @@ export default function CustomerDetailPage() {
       if (!customerData) throw new Error('Customer not found');
       
       setCustomer(customerData);
-      resetCompanyForm(customerData);
-      
-      // Load goals and deliverables
-      await Promise.all([
-        loadGoals(),
-        loadKeyDeliverables()
-      ]);
-
-      // Load organization data
-      await loadOrganizationData();
-      
-      // Fetch customer conversations
-      const { data: conversationData, error: conversationError } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('customer_id', customerId)
-        .order('created_at', { ascending: false });
-      
-      if (conversationError) throw conversationError;
-      setConversations(conversationData || []);
-      
-      // Fetch customer calls
-      const { data: callData, error: callError } = await supabase
-        .from('calls')
-        .select('*')
-        .eq('customer_id', customerId)
-        .order('created_at', { ascending: false });
-      
-      if (callError) throw callError;
-      setCalls(callData || []);
-      
-      // Fetch call participants for each call
-      if (callData && callData.length > 0) {
-        const callIds = callData.map(call => call.id);
-        const { data: participantData, error: participantError } = await supabase
-          .from('call_participants')
-          .select('*')
-          .in('call_id', callIds);
-        
-        if (participantError) throw participantError;
-        
-        // Group participants by call_id
-        const participantsByCall: Record<string, Participant[]> = {};
-        participantData?.forEach(participant => {
-          if (!participantsByCall[participant.call_id]) {
-            participantsByCall[participant.call_id] = [];
-          }
-          participantsByCall[participant.call_id].push(participant);
-        });
-        
-        setParticipants(participantsByCall);
-      }
-
-      // Fetch customer contacts
-      await loadCustomerContacts();
     } catch (err: any) {
       console.error('Error loading customer data:', err);
       setError(err.message || 'Failed to load customer data');
@@ -400,6 +396,7 @@ export default function CustomerDetailPage() {
   useEffect(() => {
     if (customerId) {
       loadCustomerData();
+      loadDeals();
     }
   }, [customerId]);
 
@@ -655,6 +652,26 @@ export default function CustomerDetailPage() {
       setDeliverablesError(err.message || 'Failed to load key deliverables');
     } finally {
       setDeliverablesLoading(false);
+    }
+  };
+  
+  // Load deals for customer
+  const loadDeals = async () => {
+    setDealsLoading(true);
+    setDealsError(null);
+    try {
+      const response = await fetch(`/api/deals/${customerId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log(data);
+      setDeals(data.deals || []);
+    } catch (err: any) {
+      console.error('Error loading deals:', err);
+      setDealsError(err.message || 'Failed to load deals');
+    } finally {
+      setDealsLoading(false);
     }
   };
   
@@ -1053,7 +1070,7 @@ export default function CustomerDetailPage() {
               {/* Customer Name & Location */}
               <div>
                 <div className="font-bold text-lg">{customer.name}</div>
-                <div className="text-gray-500 text-sm">{customer.country || customer.address || 'Location N/A'}</div>
+                <div className="text-gray-500 text-sm">{customer.country && customer.region ? `${customer.country}, ${customer.region}` : customer.country || customer.region || 'Location N/A'}</div>
               </div>
               {/* Stakeholder Matrix */}
               <div>
@@ -1070,7 +1087,13 @@ export default function CustomerDetailPage() {
                 <span className="font-semibold text-sm mb-1">Overall Sentiment</span>
                 <span className="text-2xl">
                   {/* Emoji based on sentiment score */}
-                  {customer.call_sentiment_score && customer.call_sentiment_score > 0.7 ? '😊' : customer.call_sentiment_score > 0.4 ? '😐' : '😞'}
+                  {customer.call_sentiment_score == null
+  ? '❓'
+  : customer.call_sentiment_score > 0.7
+    ? '😊'
+    : customer.call_sentiment_score > 0.4
+      ? '😐'
+      : '😞'}
                 </span>
                 <span className="text-xs text-gray-500">{customer.call_sentiment_score == null ? 'No sentiment available' : customer.call_sentiment_score > 0.7 ? 'Happy' : customer.call_sentiment_score > 0.4 ? 'Neutral' : 'Unhappy'}</span>
               </div>
@@ -1083,37 +1106,30 @@ export default function CustomerDetailPage() {
               </div>
             </div>
                         {/* --- New Summary Section (FC, Strategic Customers, Growth Enablers) --- */}
-                        <SummarySection
-              fcRemaining={1000}
-              fcBought={2000}
-              fcConsumed={1000}
-              fcConsumedMTD={500}
-              fcConsumedYTD={799}
-              strategicCustomers={[
-                { name: 'Customer 1', docks: 5, arr: 5999 },
-                { name: 'Customer 2', docks: 3, arr: 3999 },
-                { name: 'Customer 3', docks: 0, arr: 0 },
-                { name: 'Customer 4', docks: 0, arr: 0 },
-              ]}
-              growthEnablers={['Feature requests', 'Technical blockers', 'Support required']}
-            />
+                        {/* --- FC Summary Section (Live Data) --- */}
+                         {/* FC Summary Section (Live Data) */}
+                         {customer?.partner_org_id && fcSummarySection}
+                         {!customer?.partner_org_id && (
+                           <div className="p-4 text-gray-500">No partner org ID available for this customer.</div>
+                         )}
 
                         {/* --- Business Development Section --- */}
                         <BusinessDevSection
                           pipeline2025={{
-                            closedWon: 20000,
-                            contracted: 5000,
-                            totalPipeline: 100000,
-                            weightedPipeline: 50000,
+                            closedWon: customer.closed_won || 0,
+                            contracted: customer.Contracted || 0,
+                            totalPipeline: customer.totalPipelineAmount || 0,
+                            weightedPipeline: customer["Weighted Pipeline"] || 0,  
                           }}
                           quarterlyPipelines={[
                             { quarter: 'Q3 2025', totalPipeline: 50000, weightedPipeline: 20000 },
                           ]}
-                          immediateDeals={[
-                            { name: 'Deal 1', stage: 'Stage', closureDate: 'Date of Closure' },
-                            { name: 'Deal 2', stage: 'Stage', closureDate: 'Date of Closure' },
-                            { name: 'Deal 3', stage: 'Stage', closureDate: 'Date of Closure' },
-                            { name: 'Deal 4', stage: 'Stage', closureDate: 'Date of Closure' },
+                          immediateDeals={dealsLoading ? [
+                            { name: 'Loading deals...', stage: 'Loading', closureDate: 'Loading...' }
+                          ] : dealsError ? [
+                            { name: 'Error loading deals', stage: 'Error', closureDate: dealsError }
+                          ] : deals.length > 0 ? deals : [
+                            { name: 'No deals found', stage: 'N/A', closureDate: 'N/A' }
                           ]}
                           businessEnablers={['Collaterals', 'Blockers']}
                         />
@@ -1123,6 +1139,7 @@ export default function CustomerDetailPage() {
                           bdStep={"Follow up with Customer 1 and finalize contract for Q3."}
                           seStep={"Prepare demo for Deal 2 and review product feedback."}
                           mktStep={"Draft case study for closed deal and update website."}
+                          // deals={customerDeals}
                         />
           </Card>
           {/* Tabs begin directly here */}
