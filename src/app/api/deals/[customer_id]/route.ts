@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { customer_id: string } }
+  { params }: { params: Promise<{ customer_id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const { customer_id } = params;
+    const { customer_id } = await params;
 
     // Fetch deals for the specific customer by joining deals and deal_customers tables
     const { data: deals, error } = await supabase
