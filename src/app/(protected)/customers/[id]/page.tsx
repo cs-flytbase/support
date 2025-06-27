@@ -202,9 +202,25 @@ export default function CustomerDetailPage() {
   let fcSummarySection = null;
   if (partnerOrgId) {
     if (fcLoading) {
-      fcSummarySection = <div className="p-4">Loading FC summary...</div>;
-    } else if (fcError || !fcSummary) {
-      fcSummarySection = <div className="p-4 text-red-500">Failed to load FC summary.</div>;
+      fcSummarySection = <div className="p-4 bg-blue-50 text-blue-700 rounded-md">Loading FC summary...</div>;
+    } else if (fcError) {
+      fcSummarySection = (
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="text-yellow-800 font-medium">FC Summary Unavailable</div>
+          <div className="text-yellow-600 text-sm mt-1">
+            FlytCreate transaction data is currently unavailable. This may be due to data source connectivity issues.
+          </div>
+        </div>
+      );
+    } else if (!fcSummary) {
+      fcSummarySection = (
+        <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
+          <div className="text-gray-700 font-medium">No FC Data Available</div>
+          <div className="text-gray-600 text-sm mt-1">
+            No FlytCreate transaction data found for this partner organization.
+          </div>
+        </div>
+      );
     } else {
       fcSummarySection = (
         <SummarySection
