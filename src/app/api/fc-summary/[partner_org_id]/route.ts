@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchPartnerTransactions } from '@/utils/mongodb';
 
-export async function GET(req: NextRequest, { params }: { params: { partner_org_id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ partner_org_id: string }> }) {
   const log = (...args: any[]) => console.error('[FC-SUMMARY API]', ...args);
   const { partner_org_id } = await params;
   console.log('partner_org_id', partner_org_id);
