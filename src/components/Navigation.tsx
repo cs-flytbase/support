@@ -44,6 +44,7 @@ export default function Navigation() {
           <NavLink href="/calls">Calls</NavLink>
           <NavLink href="/emails">Emails</NavLink>
           <NavLink href="/customers">Customers</NavLink>
+          <NavLink href="/partners">Partners</NavLink>
           <NavLink href="/contacts">Contacts</NavLink>
           <NavLink href="/agents">Agents</NavLink>
           <NavLink href="/issues">Issues</NavLink>
@@ -80,6 +81,7 @@ export default function Navigation() {
             <NavLink href="/calls" className="block w-full">Calls</NavLink>
             <NavLink href="/emails" className="block w-full">Emails</NavLink>
             <NavLink href="/customers" className="block w-full">Customers</NavLink>
+            <NavLink href="/partners" className="block w-full">Partners</NavLink>
             <NavLink href="/contacts" className="block w-full">Contacts</NavLink>
             <NavLink href="/agents" className="block w-full">Agents</NavLink>
             <NavLink href="/issues" className="block w-full">Issues</NavLink>
