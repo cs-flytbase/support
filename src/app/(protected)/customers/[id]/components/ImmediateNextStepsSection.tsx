@@ -63,7 +63,7 @@ export const ImmediateNextStepsSection: React.FC<ImmediateNextStepsSectionProps>
                     <td className="py-2 px-3">{deal.name}</td>
                     <td className="py-2 px-3">{deal.stage}</td>
                     <td className="py-2 px-3">{deal.closureDate}</td>
-                    <td className="py-2 px-3 text-right">${deal.amount.toLocaleString()}</td> {/* Display amount */}
+                    <td className="py-2 px-3 text-right">${deal.amount?.toLocaleString() || 'TBD'}</td> {/* Display amount */}
                   </tr>
                 ))}
               </tbody>

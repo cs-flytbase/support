@@ -14,13 +14,13 @@ import { CustomerProfileSection } from "./components/CustomerProfileSection";
 import { GoalsSection } from './components/GoalsSection.table';
 import { KeyDeliverablesSection } from './components/KeyDeliverablesSection.table';
 import { CustomerDashboard } from './components/CustomerDashboard';
+import { CustomerDashboardCard } from './components/CustomerDashboardCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SummarySection } from './components/SummarySection';
 import { BusinessDevSection } from './components/BusinessDevSection';
 import { ImmediateNextStepsSection } from './components/ImmediateNextStepsSection';
-import { CustomerDashboardCard } from './components/CustomerDashboardCard';
 import { useFCSummary } from './fc-summary';
 
 // Import types
@@ -88,6 +88,114 @@ export default function CustomerDetailPage() {
   const [dealsLoading, setDealsLoading] = useState(true);
   const [dealsError, setDealsError] = useState<string | null>(null);
 
+  // Organization state
+  const [orgs, setOrgs] = useState<OrgDetails[]>([]);
+  const [orgsLoading, setOrgsLoading] = useState(true);
+  const [orgsError, setOrgsError] = useState<string | null>(null);
+  const [showOrgForm, setShowOrgForm] = useState(false);
+  const [editingOrg, setEditingOrg] = useState<OrgDetails | null>(null);
+  const [orgFormData, setOrgFormData] = useState<Partial<OrgDetails>>({
+    org_id: '',
+    org_name: '',
+    customer_id: ''
+  });
+
+  // Profile updating state
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  // Company edit state
+  const [companyFormData, setCompanyFormData] = useState<Partial<CustomerDetails>>({
+    name: '',
+    email: '',
+    phone: '',
+    website: '',
+    address: '',
+    customer_type: '',
+    industry: ''
+  });
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  // Modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  // Customer contacts state
+  const [contactsLoading, setContactsLoading] = useState(true);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [editingContact, setEditingContact] = useState<CustomerContact | null>(null);
+  const [contactFormData, setContactFormData] = useState<Partial<CustomerContact>>({
+    name: '',
+    email: '',
+    phone: '',
+    title: '',
+    is_primary: false,
+    customer_id: ''
+  });
+  const [availableCompanies, setAvailableCompanies] = useState<CustomerDetails[]>([]);
+
+  // Customer editing state
+  const [customerEditData, setCustomerEditData] = useState<Partial<CustomerDetails>>({
+    name: '',
+    email: '',
+    phone: '',
+    website: '',
+    address: '',
+    customer_type: '',
+    industry: ''
+  });
+  const [customerEditLoading, setCustomerEditLoading] = useState(false);
+  const [selectedContactForEdit, setSelectedContactForEdit] = useState<CustomerContact | null>(null);
+  const [selectedPrimaryContactId, setSelectedPrimaryContactId] = useState<string | null>(null);
+
+  // Organization, Contact, Profile, and Company form state
+  const [editingGoal, setEditingGoal] = useState<CustomerGoal | null>(null);
+  const [editingDeliverable, setEditingDeliverable] = useState<KeyDeliverable | null>(null);
+
+  // Profile and company management state
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  // Reset org form
+  const resetOrgForm = () => {
+    setOrgFormData({
+      org_id: '',
+      org_name: '',
+      customer_id: customerId
+    });
+    setEditingOrg(null);
+    setShowOrgForm(false);
+  };
+
+  // Reset contact form
+  const resetContactForm = () => {
+    setContactFormData({
+      name: '',
+      email: '',
+      phone: '',
+      title: '',
+      customer_id: customerId
+    });
+    setEditingContact(null);
+    setShowContactForm(false);
+  };
+
+  // Placeholder functions for goals and deliverables
+  const saveGoal = async (goalData: any) => {
+    // Implementation would go here
+    console.log('Save goal:', goalData);
+  };
+
+  const editGoal = (goal: CustomerGoal) => {
+    setEditingGoal(goal);
+  };
+
+  const saveDeliverable = async (deliverableData: any) => {
+    // Implementation would go here
+    console.log('Save deliverable:', deliverableData);
+  };
+
+  const editDeliverable = (deliverable: KeyDeliverable) => {
+    setEditingDeliverable(deliverable);
+  };
+
   // FC Summary hook and section (must be after all hooks)
   const partnerOrgId = customer?.partner_org_id;
   const { data: fcSummary, loading: fcLoading, error: fcError } = useFCSummary(partnerOrgId);
@@ -116,69 +224,6 @@ export default function CustomerDetailPage() {
       );
     }
   }
-
-  
-  // Profile updating state
-  const [profileSaving, setProfileSaving] = useState(false);
-  
-  // Organization state
-  const [orgs, setOrgs] = useState<OrgDetails[]>([]);
-  const [orgsLoading, setOrgsLoading] = useState(true);
-  const [orgsError, setOrgsError] = useState<string | null>(null);
-  const [showOrgForm, setShowOrgForm] = useState(false);
-  const [editingOrg, setEditingOrg] = useState<OrgDetails | null>(null);
-  const [orgFormData, setOrgFormData] = useState<Partial<OrgDetails>>({
-    org_id: '',
-    org_name: '',
-    customer_id: ''
-  });
-  
-  // Company edit state
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [companyFormData, setCompanyFormData] = useState<Partial<CustomerDetails>>({
-    name: '',
-    email: '',
-    phone: '',
-    website: '',
-    address: '',
-    customer_type: '',
-    industry: ''
-  });
-  const [saveLoading, setSaveLoading] = useState(false);
-  
-  // Customer contacts state
-  const [contactsLoading, setContactsLoading] = useState(true);
-  const [showContactForm, setShowContactForm] = useState(false);
-  const [editingContact, setEditingContact] = useState<CustomerContact | null>(null);
-  const [contactFormData, setContactFormData] = useState<Partial<CustomerContact>>({
-    name: '',
-    email: '',
-    phone: '',
-    title: '',
-    is_primary: false,
-    customer_id: ''
-  });
-  
-  // State for available companies
-  const [availableCompanies, setAvailableCompanies] = useState<CustomerDetails[]>([]);
-  
-  // Deals state for the customer
-  const [customerDeals, setCustomerDeals] = useState<Array<{name: string, stage: string, closureDate: string, amount: number}>>([]);
-
-  // Customer edit state
-  const [showCustomerEditModal, setShowCustomerEditModal] = useState(false);
-  const [customerEditData, setCustomerEditData] = useState<Partial<CustomerDetails>>({
-    name: '',
-    email: '',
-    phone: '',
-    website: '',
-    address: '',
-    customer_type: '',
-    industry: ''
-  });
-  const [customerEditLoading, setCustomerEditLoading] = useState(false);
-  const [selectedContactForEdit, setSelectedContactForEdit] = useState<CustomerContact | null>(null);
-  const [selectedPrimaryContactId, setSelectedPrimaryContactId] = useState<string | null>(null);
 
   // Handle primary contact change in edit modal
   const handlePrimaryContactChange = (contactId: string) => {
@@ -258,7 +303,7 @@ export default function CustomerDetailPage() {
     setSaveLoading(true);
     
     try {
-      // First update the customer details - omitting primary_contact_id until column is added
+      // First update the customer details
       const { error } = await supabase
         .from('customers')
         .update({
@@ -315,7 +360,7 @@ export default function CustomerDetailPage() {
       setSaveLoading(false);
     }
   };
-  
+
   // Load all available companies for the contact form
   const loadAvailableCompanies = async () => {
     try {
@@ -329,6 +374,239 @@ export default function CustomerDetailPage() {
     } catch (err: any) {
       console.error('Error loading companies:', err);
       // We don't set the error state here to avoid disrupting the main UI
+    }
+  };
+
+  // Load organization data
+  const loadOrganizations = async () => {
+    setOrgsLoading(true);
+    setOrgsError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('customer_organizations')
+        .select('*')
+        .eq('customer_id', customerId);
+      
+      if (error) throw error;
+      setOrgs(data || []);
+    } catch (err: any) {
+      console.error('Error loading organization data:', err);
+      setOrgsError(err.message || 'Failed to load organization data');
+    } finally {
+      setOrgsLoading(false);
+    }
+  };
+
+  // Handle organization form change
+  const handleOrgFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setOrgFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Save organization
+  const saveOrg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      if (editingOrg) {
+        // Update existing organization
+        const { error } = await supabase
+          .from('customer_organizations')
+          .update({
+            org_id: orgFormData.org_id,
+            org_name: orgFormData.org_name,
+            updated_at: new Date().toISOString()
+          })
+          .eq('org_id', editingOrg.org_id);
+        
+        if (error) throw error;
+      } else {
+        // Add new organization
+        const { error } = await supabase
+          .from('customer_organizations')
+          .insert([{
+            customer_id: customerId,
+            org_id: orgFormData.org_id,
+            org_name: orgFormData.org_name,
+          }]);
+        
+        if (error) throw error;
+      }
+      
+      // Reset form and reload data
+      setShowOrgForm(false);
+      setEditingOrg(null);
+      setOrgFormData({
+        org_id: '',
+        org_name: '',
+        customer_id: ''
+      });
+      await loadOrganizations();
+    } catch (err: any) {
+      console.error('Error saving organization:', err);
+      setOrgsError(err.message || 'Failed to save organization');
+    }
+  };
+
+  // Handle edit organization
+  const handleEditOrg = (org: OrgDetails) => {
+    setEditingOrg(org);
+    setOrgFormData({
+      org_id: org.org_id || '',
+      org_name: org.org_name || '',
+      customer_id: org.customer_id || customerId
+    });
+    setShowOrgForm(true);
+  };
+
+  // Handle delete organization
+  const handleDeleteOrg = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this organization?')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('customer_organizations')
+        .delete()
+        .eq('org_id', id);
+        
+      if (error) throw error;
+      
+      // Reload organizations
+      await loadOrganizations();
+    } catch (err: any) {
+      console.error('Error deleting organization:', err);
+      setOrgsError(err.message || 'Failed to delete organization');
+    }
+  };
+
+  // Handle contact form change
+  const handleContactFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    const finalValue = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+    setContactFormData(prev => ({ ...prev, [name]: finalValue }));
+  };
+
+  // Save contact
+  const saveContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      if (editingContact) {
+        // Update existing contact
+        const { error } = await supabase
+          .from('customer_contacts')
+          .update({
+            name: contactFormData.name,
+            email: contactFormData.email || null,
+            phone: contactFormData.phone || null,
+            title: contactFormData.title || null,
+            is_primary: contactFormData.is_primary || false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingContact.id);
+        
+        if (error) throw error;
+      } else {
+        // Add new contact
+        const { error } = await supabase
+          .from('customer_contacts')
+          .insert([{
+            customer_id: customerId,
+            name: contactFormData.name,
+            email: contactFormData.email || null,
+            phone: contactFormData.phone || null,
+            title: contactFormData.title || null,
+            is_primary: contactFormData.is_primary || false,
+          }]);
+        
+        if (error) throw error;
+      }
+      
+      // Reset form and reload data
+      setShowContactForm(false);
+      setEditingContact(null);
+      setContactFormData({
+        name: '',
+        email: '',
+        phone: '',
+        title: '',
+        is_primary: false,
+        customer_id: customerId
+      });
+      await loadCustomerContacts();
+    } catch (err: any) {
+      console.error('Error saving contact:', err);
+      setContactsError(err.message || 'Failed to save contact');
+    }
+  };
+
+  // Handle edit contact
+  const handleEditContact = (contact: CustomerContact) => {
+    setEditingContact(contact);
+    setContactFormData({
+      name: contact.name || '',
+      email: contact.email || '',
+      phone: contact.phone || '',
+      title: contact.title || '',
+      is_primary: contact.is_primary,
+      customer_id: contact.customer_id || customerId
+    });
+    setShowContactForm(true);
+  };
+
+  // Delete contact
+  const handleDeleteContact = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this contact?')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('customer_contacts')
+        .delete()
+        .eq('id', id);
+        
+      if (error) throw error;
+      
+      // Reload contacts
+      await loadCustomerContacts();
+    } catch (err: any) {
+      console.error('Error deleting contact:', err);
+      setContactsError(err.message || 'Failed to delete contact');
+    }
+  };
+
+  // Update customer profile
+  const updateCustomerProfile = async (profileText: string) => {
+    setProfileSaving(true);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          customer_profile: profileText,
+          // The database trigger will update customer_profile_update_time automatically
+        })
+        .eq('id', customerId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      if (customer) {
+        setCustomer({
+          ...customer,
+          customer_profile: profileText,
+          customer_profile_update_time: new Date().toISOString()
+        });
+      }
+    } catch (err: any) {
+      console.error('Error updating customer profile:', err);
+      setError(err.message || 'Failed to update customer profile');
+      throw err; // Re-throw to be caught by the component
+    } finally {
+      setProfileSaving(false);
     }
   };
 
@@ -361,6 +639,60 @@ export default function CustomerDetailPage() {
       if (!customerData) throw new Error('Customer not found');
       
       setCustomer(customerData);
+      
+      // Load goals and deliverables
+      await Promise.all([
+        loadGoals(),
+        loadKeyDeliverables()
+      ]);
+
+      // Load organization data
+      await loadOrganizationData();
+      
+      // Fetch customer conversations
+      const { data: conversationData, error: conversationError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false });
+      
+      if (conversationError) throw conversationError;
+      setConversations(conversationData || []);
+      
+      // Fetch customer calls
+      const { data: callData, error: callError } = await supabase
+        .from('calls')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('actual_start_time', { ascending: false });
+      
+      if (callError) throw callError;
+      setCalls(callData || []);
+      
+      // Fetch call participants for each call
+      if (callData && callData.length > 0) {
+        const callIds = callData.map(call => call.id);
+        const { data: participantData, error: participantError } = await supabase
+          .from('call_participants')
+          .select('*')
+          .in('call_id', callIds);
+        
+        if (participantError) throw participantError;
+        
+        // Group participants by call_id
+        const participantsByCall: Record<string, Participant[]> = {};
+        participantData?.forEach(participant => {
+          if (!participantsByCall[participant.call_id]) {
+            participantsByCall[participant.call_id] = [];
+          }
+          participantsByCall[participant.call_id].push(participant);
+        });
+        
+        setParticipants(participantsByCall);
+      }
+
+      // Fetch customer contacts
+      await loadCustomerContacts();
     } catch (err: any) {
       console.error('Error loading customer data:', err);
       setError(err.message || 'Failed to load customer data');
@@ -393,176 +725,6 @@ export default function CustomerDetailPage() {
     }
   };
 
-  // Load customer data when customerId changes
-  useEffect(() => {
-    if (customerId) {
-      loadCustomerData();
-      loadDeals();
-    }
-  }, [customerId]);
-
-  // Handle contact form input change
-  const handleContactFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
-      const checked = (e.target as HTMLInputElement).checked;
-      setContactFormData(prev => ({ ...prev, [name]: checked }));
-    } else {
-      setContactFormData(prev => ({ ...prev, [name]: value }));
-    }
-  };
-
-  // Reset contact form
-  const resetContactForm = () => {
-    setContactFormData({
-      name: '',
-      email: '',
-      phone: '',
-      title: '',
-      is_primary: false,
-      customer_id: customerId // Default to current customer
-    });
-    setEditingContact(null);
-    setShowContactForm(false);
-  };
-
-  // Create or update contact
-  const saveContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!contactFormData.name) {
-      alert('Contact name is required');
-      return;
-    }
-    
-    // Ensure we have a valid customer_id
-    const targetCustomerId = contactFormData.customer_id || customerId;
-    
-    try {
-      if (editingContact) {
-        // Update existing contact
-        const { error } = await supabase
-          .from('customer_contacts')
-          .update({
-            name: contactFormData.name,
-            email: contactFormData.email || null,
-            phone: contactFormData.phone || null,
-            title: contactFormData.title || null,
-            is_primary: contactFormData.is_primary || false,
-            customer_id: targetCustomerId,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', editingContact.id);
-          
-        if (error) throw error;
-      } else {
-        // Create new contact
-        const { error } = await supabase
-          .from('customer_contacts')
-          .insert({
-            customer_id: targetCustomerId,
-            name: contactFormData.name,
-            email: contactFormData.email || null,
-            phone: contactFormData.phone || null,
-            title: contactFormData.title || null,
-            is_primary: contactFormData.is_primary || false
-          });
-          
-        if (error) throw error;
-      }
-      
-      // If contact was moved to another company, we may need to redirect
-      if (editingContact && targetCustomerId !== customerId) {
-        // Reload the contacts list first
-        await loadCustomerContacts();
-        resetContactForm();
-        
-        // Show a success message that the contact was moved
-        const targetCompany = availableCompanies.find(c => c.id === targetCustomerId);
-        setContactsError(`Contact successfully moved to ${targetCompany?.name || 'another company'}`);
-      } else {
-        // Regular save - just reload contacts
-        await loadCustomerContacts();
-        resetContactForm();
-      }
-    } catch (err: any) {
-      console.error('Error saving contact:', err);
-      setContactsError(err.message || 'Failed to save contact');
-    }
-  };
-
-  // Traditional Edit contact function (kept for backward compatibility)
-  const handleEditContact = (contact: CustomerContact) => {
-    setEditingContact(contact);
-    setContactFormData({
-      name: contact.name,
-      email: contact.email || '',
-      phone: contact.phone || '',
-      title: contact.title || '',
-      is_primary: contact.is_primary,
-      customer_id: contact.customer_id || customerId
-    });
-    setShowContactForm(true);
-  };
-
-  // Delete contact
-  const handleDeleteContact = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this contact?')) {
-      return;
-    }
-    
-    try {
-      const { error } = await supabase
-        .from('customer_contacts')
-        .delete()
-        .eq('id', id);
-        
-      if (error) throw error;
-      
-      // Reload contacts
-      await loadCustomerContacts();
-    } catch (err: any) {
-      console.error('Error deleting contact:', err);
-      setContactsError(err.message || 'Failed to delete contact');
-    }
-  };
-
-  // Format date for display
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
-  };
-  
-  // Format duration in minutes:seconds
-  const formatDuration = (seconds: number | null) => {
-    if (!seconds) return 'N/A';
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  // Load organization data
-  const loadOrganizationData = async () => {
-    setOrgsLoading(true);
-    setOrgsError(null);
-    
-    try {
-      const { data, error } = await supabase
-        .from('org')
-        .select('*')
-        .eq('customer_id', customerId);
-      
-      if (error) throw error;
-      setOrgs(data || []);
-    } catch (err: any) {
-      console.error('Error loading organization data:', err);
-      setOrgsError(err.message || 'Failed to load organization data');
-    } finally {
-      setOrgsLoading(false);
-    }
-  };
-  
   // Load customer calls
   const loadCalls = async () => {
     try {
@@ -612,6 +774,27 @@ export default function CustomerDetailPage() {
     }
   };
 
+  // Load organization data
+  const loadOrganizationData = async () => {
+    setOrgsLoading(true);
+    setOrgsError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('org')
+        .select('*')
+        .eq('customer_id', customerId);
+      
+      if (error) throw error;
+      setOrgs(data || []);
+    } catch (err: any) {
+      console.error('Error loading organization data:', err);
+      setOrgsError(err.message || 'Failed to load organization data');
+    } finally {
+      setOrgsLoading(false);
+    }
+  };
+  
   // Load customer goals
   const loadGoals = async () => {
     setGoalsLoading(true);
@@ -673,37 +856,6 @@ export default function CustomerDetailPage() {
       setDealsError(err.message || 'Failed to load deals');
     } finally {
       setDealsLoading(false);
-    }
-  };
-  
-  // Update customer profile
-  const updateCustomerProfile = async (profileText: string) => {
-    setProfileSaving(true);
-    try {
-      const { error } = await supabase
-        .from('customers')
-        .update({
-          customer_profile: profileText,
-          // The database trigger will update customer_profile_update_time automatically
-        })
-        .eq('id', customerId);
-        
-      if (error) throw error;
-      
-      // Update local state
-      if (customer) {
-        setCustomer({
-          ...customer,
-          customer_profile: profileText,
-          customer_profile_update_time: new Date().toISOString()
-        });
-      }
-    } catch (err: any) {
-      console.error('Error updating customer profile:', err);
-      setError(err.message || 'Failed to update customer profile');
-      throw err; // Re-throw to be caught by the component
-    } finally {
-      setProfileSaving(false);
     }
   };
   
@@ -903,137 +1055,26 @@ export default function CustomerDetailPage() {
     }
   };
 
-  // Handle org form input change
-  const handleOrgFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setOrgFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Reset org form
-  const resetOrgForm = () => {
-    setOrgFormData({
-      org_id: '',
-      org_name: '',
-      customer_id: customerId
-    });
-    setEditingOrg(null);
-    setShowOrgForm(false);
-  };
-
-  // Create or update organization
-  const saveOrg = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!orgFormData.org_id || !orgFormData.org_name) {
-      alert('Organization ID and name are required');
-      return;
+  // Load customer data when customerId changes
+  useEffect(() => {
+    if (customerId) {
+      loadCustomerData();
+      loadDeals();
     }
-    
-    try {
-      // First check if the org_id already exists (for new orgs)
-      if (!editingOrg) {
-        const { data: existingOrg, error: checkError } = await supabase
-          .from('org')
-          .select('org_id')
-          .eq('org_id', orgFormData.org_id)
-          .maybeSingle();
+  }, [customerId]);
 
-        if (checkError) throw checkError;
-        
-        // If org_id already exists, show a specific error message
-        if (existingOrg) {
-          setOrgsError(`Organization ID '${orgFormData.org_id}' already exists. Please use a different ID.`);
-          return;
-        }
-      }
-      
-      if (editingOrg) {
-        // Check if we're changing the org_id and if so, ensure it doesn't conflict
-        if (editingOrg.org_id !== orgFormData.org_id) {
-          const { data: existingOrg, error: checkError } = await supabase
-            .from('org')
-            .select('org_id')
-            .eq('org_id', orgFormData.org_id)
-            .maybeSingle();
+  // Format date for display
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString();
+  };
   
-          if (checkError) throw checkError;
-          
-          // If org_id already exists, show a specific error message
-          if (existingOrg) {
-            setOrgsError(`Organization ID '${orgFormData.org_id}' already exists. Please use a different ID.`);
-            return;
-          }
-        }
-        
-        // Update existing organization
-        const { error } = await supabase
-          .from('org')
-          .update({
-            org_id: orgFormData.org_id,
-            org_name: orgFormData.org_name,
-            updated_at: new Date().toISOString()
-          })
-          .eq('org_id', editingOrg.org_id);
-          
-        if (error) throw error;
-      } else {
-        // Create new organization
-        const { error } = await supabase
-          .from('org')
-          .insert({
-            org_id: orgFormData.org_id,
-            org_name: orgFormData.org_name,
-            customer_id: customerId
-          });
-          
-        if (error) throw error;
-      }
-      
-      // Reload orgs list
-      await loadOrganizationData();
-      resetOrgForm();
-      setOrgsError(null); // Clear any previous errors on success
-    } catch (err: any) {
-      console.error('Error saving organization:', err);
-      if (err.code === '23505' || err.message?.includes('duplicate key')) {
-        setOrgsError(`Organization ID '${orgFormData.org_id}' already exists. Please use a different ID.`);
-      } else {
-        setOrgsError(err.message || 'Failed to save organization');
-      }
-    }
-  };
-
-  // Edit organization
-  const handleEditOrg = (org: OrgDetails) => {
-    setEditingOrg(org);
-    setOrgFormData({
-      org_id: org.org_id,
-      org_name: org.org_name,
-      customer_id: org.customer_id
-    });
-    setShowOrgForm(true);
-  };
-
-  // Delete organization
-  const handleDeleteOrg = async (orgId: string) => {
-    if (!confirm('Are you sure you want to delete this organization ID?')) {
-      return;
-    }
-    
-    try {
-      const { error } = await supabase
-        .from('org')
-        .delete()
-        .eq('org_id', orgId);
-        
-      if (error) throw error;
-      
-      // Reload orgs
-      await loadOrganizationData();
-    } catch (err: any) {
-      console.error('Error deleting organization:', err);
-      setOrgsError(err.message || 'Failed to delete organization');
-    }
+  // Format duration in minutes:seconds
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return 'N/A';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -1064,7 +1105,66 @@ export default function CustomerDetailPage() {
       ) : customer ? (
         <div className="space-y-8">
           {/* Master Section - Major Customer Details */}
-          <CustomerDashboardCard
+          {/* <CustomerDashboardCard
+            customer={customer}
+            contacts={contacts}
+            deals={deals}
+            dealsLoading={dealsLoading}
+            dealsError={dealsError}
+            fcSummarySection={fcSummarySection}
+          /> */}
+
+          {/* Tabbed Interface */}
+          <Tabs defaultValue="dashboard" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="contacts">Contacts</TabsTrigger>
+              <TabsTrigger value="activities">Activities</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dashboard">
+              {/* <div className="space-y-6">
+                <CustomerInfoCard 
+                  customer={customer} 
+                  contacts={contacts}
+                  onEdit={() => setShowEditModal(true)}
+                  formatDate={formatDate}
+                />
+                {fcSummarySection}
+                <BusinessDevSection 
+                  pipeline2025={{
+                    closedWon: 0,
+                    contracted: 0,
+                    totalPipeline: deals?.reduce((sum, deal) => sum + (deal.amount || 0), 0) || 0,
+                    weightedPipeline: deals?.reduce((sum, deal) => sum + (deal.amount || 0) * 0.5, 0) || 0
+                  }}
+                  quarterlyPipelines={[
+                    { quarter: "Q1 2025", totalPipeline: 0, weightedPipeline: 0 },
+                    { quarter: "Q2 2025", totalPipeline: 0, weightedPipeline: 0 },
+                    { quarter: "Q3 2025", totalPipeline: 0, weightedPipeline: 0 },
+                    { quarter: "Q4 2025", totalPipeline: 0, weightedPipeline: 0 }
+                  ]}
+                  immediateDeals={deals?.map(deal => ({
+                    name: deal.name,
+                    stage: deal.stage || 'Unknown',
+                    closureDate: deal.closureDate || 'TBD',
+                    amount: deal.amount
+                  })) || []}
+                  businessEnablers={[
+                    "Expand existing partnerships",
+                    "Develop new product features",
+                    "Increase market presence"
+                  ]}
+                />
+                <ImmediateNextStepsSection 
+                  bdStep={customer?.bd_step || "No BD step defined"}
+                  seStep={customer?.se_step || "No SE step defined"}
+                  mktStep={customer?.mkt_step || "No Marketing step defined"}
+                  deals={deals}
+                />
+              </div> */}
+                        <CustomerDashboardCard
             customer={customer}
             contacts={contacts}
             deals={deals}
@@ -1072,10 +1172,144 @@ export default function CustomerDetailPage() {
             dealsError={dealsError}
             fcSummarySection={fcSummarySection}
           />
+            </TabsContent>
 
-          {/* Tabbed Interface */}
-      
-          
+            
+            <TabsContent value="details">
+              {/* Customer Profile and Organizations */}
+              <Card className="p-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <CustomerProfileSection 
+                    customer={customer} 
+                    onSave={updateCustomerProfile}
+                    formatDate={formatDate}
+                  />
+                  
+                  <OrganizationSection 
+                    orgs={orgs} 
+                    isLoading={orgsLoading} 
+                    error={orgsError} 
+                    formData={orgFormData}
+                    showForm={showOrgForm}
+                    editingOrg={editingOrg}
+                    formatDate={formatDate}
+                    onFormChange={handleOrgFormChange}
+                    onSave={saveOrg}
+                    onCancel={() => setShowOrgForm(false)}
+                    onShowForm={() => {
+                      setEditingOrg(null);
+                      setOrgFormData({
+                        org_id: '',
+                        org_name: '',
+                        customer_id: customerId
+                      });
+                      setShowOrgForm(true);
+                    }}
+                    onEdit={handleEditOrg}
+                    onDelete={handleDeleteOrg}
+                  />
+                </div>
+              </Card>
+              
+              {/* Goals and Deliverables Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <GoalsSection 
+                  goals={goals} 
+                  isLoading={goalsLoading} 
+                  error={goalsError}
+                  formatDate={formatDate}
+                  onAddGoal={async (goalText, priority, status, agentName) => {
+                    // Implementation for adding a goal
+                    console.log('Adding goal:', { goalText, priority, status, agentName });
+                    await loadGoals();
+                  }}
+                  onUpdateGoal={async (goalId, goalText, priority, status, agentName) => {
+                    // Implementation for updating a goal
+                    console.log('Updating goal:', { goalId, goalText, priority, status, agentName });
+                    await loadGoals();
+                  }}
+                  onDeleteGoal={async (goalId) => {
+                    // Implementation for deleting a goal
+                    console.log('Deleting goal:', goalId);
+                    await loadGoals();
+                  }}
+                />
+                
+                <KeyDeliverablesSection 
+                  deliverables={deliverables} 
+                  isLoading={deliverablesLoading} 
+                  error={deliverablesError}
+                  formatDate={formatDate}
+                  onAddDeliverable={async (text, editable, priority, status, agentName) => {
+                    // Implementation for adding a deliverable
+                    console.log('Adding deliverable:', { text, editable, priority, status, agentName });
+                    await loadKeyDeliverables();
+                  }}
+                  onUpdateDeliverable={async (id, text, priority, status, agentName) => {
+                    // Implementation for updating a deliverable
+                    console.log('Updating deliverable:', { id, text, priority, status, agentName });
+                    await loadKeyDeliverables();
+                  }}
+                  onDeleteDeliverable={async (id) => {
+                    // Implementation for deleting a deliverable
+                    console.log('Deleting deliverable:', id);
+                    await loadKeyDeliverables();
+                  }}
+                />
+              </div>
+            </TabsContent>
+            
+            {/* Contacts Tab */}
+            <TabsContent value="contacts">
+              <Card className="p-6">
+                <ContactsSection 
+                  contacts={contacts} 
+                  isLoading={contactsLoading} 
+                  error={contactsError}
+                  showForm={showContactForm}
+                  formData={contactFormData}
+                  editingContact={editingContact}
+                  availableCompanies={availableCompanies}
+                  onFormChange={handleContactFormChange}
+                  onSave={saveContact}
+                  onCancel={() => setShowContactForm(false)}
+                  onSetPrimary={setPrimaryContact}
+                  formatDate={formatDate}
+                  onShowForm={() => {
+                    setEditingContact(null);
+                    setContactFormData({
+                      name: '',
+                      email: '',
+                      phone: '',
+                      title: '',
+                      is_primary: false,
+                      customer_id: customerId
+                    });
+                    setShowContactForm(true);
+                  }}
+                  onEdit={handleEditContact}
+                  onDelete={handleDeleteContact}
+                />
+              </Card>
+            </TabsContent>
+            
+            {/* Activities Tab */}
+            <TabsContent value="activities">
+              <Card className="p-6">
+                <CommunicationTabs 
+                  calls={calls}
+                  conversations={conversations}
+                  participants={participants}
+                  isLoading={false /* Force loading to false to prevent perpetual loading */}
+                  error={callsError}
+                  onReloadCalls={loadCalls}
+                  formatDate={formatDate}
+                  formatDuration={formatDuration}
+                />
+              </Card>
+            </TabsContent>    
+          </Tabs>
+
           {/* Customer Edit Modal */}
           <EditCustomerModal 
             isOpen={showEditModal}
