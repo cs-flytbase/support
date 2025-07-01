@@ -87,38 +87,46 @@ export function CustomerDashboardCard({
       </div>
 
       {/* FC Summary Section (Live Data) */}
-      {customer?.partner_org_id && fcSummarySection}
-      {!customer?.partner_org_id && (
-        <div className="p-4 text-gray-500">No partner org ID available for this customer.</div>
-      )}
+      <div className="mt-6">
+        {customer?.partner_org_id && fcSummarySection}
+        {!customer?.partner_org_id && (
+          <div className="p-4 text-gray-500 text-center bg-gray-50 rounded">
+            No partner org ID available for this customer.
+          </div>
+        )}
+      </div>
 
       {/* Business Development Section */}
-      <BusinessDevSection
-        pipeline2025={{
-          closedWon: customer.closed_won || 0,
-          contracted: customer.Contracted || 0,
-          totalPipeline: customer.totalPipelineAmount || 0,
-          weightedPipeline: customer["Weighted Pipeline"] || 0,  
-        }}
-        quarterlyPipelines={[
-          { quarter: 'Q3 2025', totalPipeline: 50000, weightedPipeline: 20000 },
-        ]}
-        immediateDeals={dealsLoading ? [
-          { name: 'Loading deals...', stage: 'Loading', closureDate: 'Loading...' }
-        ] : dealsError ? [
-          { name: 'Error loading deals', stage: 'Error', closureDate: dealsError }
-        ] : deals.length > 0 ? deals : [
-          { name: 'No deals found', stage: 'N/A', closureDate: 'N/A' }
-        ]}
-        businessEnablers={['Collaterals', 'Blockers']}
-      />
+      <div className="mt-6">
+        <BusinessDevSection
+          pipeline2025={{
+            closedWon: customer.closed_won || 0,
+            contracted: customer.Contracted || 0,
+            totalPipeline: customer.totalPipelineAmount || 0,
+            weightedPipeline: customer["Weighted Pipeline"] || 0,  
+          }}
+          quarterlyPipelines={[
+            { quarter: 'Q3 2025', totalPipeline: 50000, weightedPipeline: 20000 },
+          ]}
+          immediateDeals={dealsLoading ? [
+            { name: 'Loading deals...', stage: 'Loading', closureDate: 'Loading...' }
+          ] : dealsError ? [
+            { name: 'Error loading deals', stage: 'Error', closureDate: dealsError }
+          ] : deals.length > 0 ? deals : [
+            { name: 'No deals found', stage: 'N/A', closureDate: 'N/A' }
+          ]}
+          businessEnablers={['Collaterals', 'Blockers']}
+        />
+      </div>
 
       {/* Immediate Next Steps Section */}
-      <ImmediateNextStepsSection
-        bdStep={"Follow up with Customer 1 and finalize contract for Q3."}
-        seStep={"Prepare demo for Deal 2 and review product feedback."}
-        mktStep={"Draft case study for closed deal and update website."}
-      />
+      <div className="mt-6">
+        <ImmediateNextStepsSection
+          bdStep={"Follow up with Customer 1 and finalize contract for Q3."}
+          seStep={"Prepare demo for Deal 2 and review product feedback."}
+          mktStep={"Draft case study for closed deal and update website."}
+        />
+      </div>
     </Card>
   );
 }

@@ -234,7 +234,7 @@ export default function PartnersPage() {
         {/* FlytCreate Data */}
         <Card className="border border-gray-300">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold">FlytCreate Data</CardTitle>
+            <CardTitle className="text-lg font-semibold">Global FlytCredit Data</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-3 gap-4 text-sm">
