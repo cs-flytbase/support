@@ -1,4 +1,5 @@
 "use client";
+import { CustomerEditTab } from './components/CustomerEditTab';
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -1137,6 +1138,7 @@ export default function CustomerDetailPage() {
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="contacts">Contacts</TabsTrigger>
               <TabsTrigger value="activities">Activities</TabsTrigger>
+              <TabsTrigger value="edit">Edit All Fields</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard">
@@ -1324,6 +1326,17 @@ export default function CustomerDetailPage() {
                 />
               </Card>
             </TabsContent>    
+            <TabsContent value="edit">
+  <CustomerEditTab
+    customer={customer}
+    customerId={customerId}
+    onCustomerUpdate={(updatedCustomer) => {
+      setCustomer(updatedCustomer);
+      // Optionally reload other data that might depend on customer changes
+      // loadCustomerData();
+    }}
+  />
+</TabsContent>
           </Tabs>
 
           {/* Customer Edit Modal */}

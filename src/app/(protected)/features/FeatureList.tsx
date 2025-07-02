@@ -30,7 +30,11 @@ const PRODUCT_OPTIONS = ['flytbase', 'air', 'verkos'];
 
 export default function FeatureList() {
   const [features, setFeatures] = useState<Feature[]>([]);
+  const [filteredFeatures, setFilteredFeatures] = useState<Feature[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
   const pathname = usePathname();
   const selectedId = pathname.split('/').pop();
   const [showAddModal, setShowAddModal] = useState(false);
@@ -59,9 +63,42 @@ export default function FeatureList() {
       .select('id,feature_name,category,description,product,use_case')
       .order('category', { ascending: true })
       .order('feature_name', { ascending: true });
-    setFeatures(data || []);
+    
+    const featuresData = data || [];
+    setFeatures(featuresData);
+    
+    // Extract unique categories for filter dropdown
+    const uniqueCategories = [...new Set(
+      featuresData
+        .map(feature => feature.category)
+        .filter(category => category && category.trim() !== '')
+    )].sort();
+    setCategories(uniqueCategories);
+    
     setLoading(false);
   }
+
+  // Filter features based on search term and selected category
+  useEffect(() => {
+    let filtered = features;
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(feature =>
+        feature.feature_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        feature.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        feature.product?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        feature.use_case?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply category filter
+    if (selectedCategory && selectedCategory !== '') {
+      filtered = filtered.filter(feature => feature.category === selectedCategory);
+    }
+
+    setFilteredFeatures(filtered);
+  }, [features, searchTerm, selectedCategory]);
 
   useEffect(() => {
     fetchFeatures();
@@ -110,9 +147,11 @@ export default function FeatureList() {
     setAddForm(f => ({ ...f, instructions_tags: [...f.instructions_tags, value] }));
     if (tagInputRef.current) tagInputRef.current.value = '';
   }
+  
   function handleRemoveTag(tag: string) {
     setAddForm(f => ({ ...f, instructions_tags: f.instructions_tags.filter(t => t !== tag) }));
   }
+  
   function handleAddSnippet(e: React.FormEvent<HTMLButtonElement>) {
     e.preventDefault();
     const value = snippetInputRef.current?.value.trim() ?? '';
@@ -120,13 +159,25 @@ export default function FeatureList() {
     setAddForm(f => ({ ...f, snippets: [...f.snippets, value] }));
     if (snippetInputRef.current) snippetInputRef.current.value = '';
   }
+  
   function handleRemoveSnippet(snippet: string) {
     setAddForm(f => ({ ...f, snippets: f.snippets.filter(s => s !== snippet) }));
   }
 
-  const formatDate = (id: string) => {
-    // Simple date formatting - you can customize this based on your needs
-    return new Date().toLocaleDateString();
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+
+  // Handle category filter change
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedCategory(e.target.value);
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('');
   };
 
   if (loading) return <div className="p-4">Loading...</div>;
@@ -149,22 +200,52 @@ export default function FeatureList() {
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar and Filters */}
       <div className="bg-white border-b px-6 py-3">
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
             <input
               type="text"
               placeholder="Search features..."
+              value={searchTerm}
+              onChange={handleSearchChange}
               className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <svg className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option>All Categories</option>
+          <select 
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={selectedCategory}
+            onChange={handleCategoryChange}
+          >
+            <option value="">All Categories</option>
+            {categories.map(category => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
           </select>
+          {(searchTerm || selectedCategory) && (
+            <button
+              onClick={clearFilters}
+              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+        
+        {/* Results count */}
+        <div className="mt-2 text-sm text-gray-600">
+          Showing {filteredFeatures.length} of {features.length} features
+          {searchTerm && (
+            <span> matching "{searchTerm}"</span>
+          )}
+          {selectedCategory && (
+            <span> in category "{selectedCategory}"</span>
+          )}
         </div>
       </div>
 
@@ -173,9 +254,6 @@ export default function FeatureList() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date
-              </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Feature Name
               </th>
@@ -188,50 +266,62 @@ export default function FeatureList() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Description
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {features.map((feature, index) => (
-              <tr 
-                key={feature.id}
-                className={`hover:bg-gray-50 cursor-pointer ${
-                  selectedId === feature.id ? 'bg-blue-50' : ''
-                }`}
-              >
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
-                    {formatDate(feature.id)}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Link href={`/features/${feature.id}`} className="text-blue-600 hover:text-blue-800">
-                    {feature.feature_name}
-                  </Link>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {feature.product || 'N/A'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {feature.category || 'Uncategorized'}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                  {feature.description || 'No description available'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    index % 3 === 0 ? 'bg-green-100 text-green-800' :
-                    index % 3 === 1 ? 'bg-blue-100 text-blue-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {index % 3 === 0 ? 'Active' : index % 3 === 1 ? 'Pending' : 'Draft'}
-                  </span>
+            {filteredFeatures.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                  {searchTerm || selectedCategory ? (
+                    <div>
+                      <p className="text-lg mb-2">No features found</p>
+                      <p className="text-sm">Try adjusting your search or filter criteria</p>
+                      <button
+                        onClick={clearFilters}
+                        className="mt-2 text-blue-600 hover:text-blue-800 text-sm underline"
+                      >
+                        Clear all filters
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-lg mb-2">No features available</p>
+                      <p className="text-sm">Create your first feature to get started</p>
+                    </div>
+                  )}
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredFeatures.map((feature) => (
+                <tr 
+                  key={feature.id}
+                  className={`hover:bg-gray-50 cursor-pointer ${
+                    selectedId === feature.id ? 'bg-blue-50' : ''
+                  }`}
+                >
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Link href={`/features/${feature.id}`} className="text-blue-600 hover:text-blue-800 font-medium">
+                      {feature.feature_name}
+                    </Link>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {feature.product || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {feature.category || (
+                      <span className="text-gray-400 italic">Uncategorized</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                    {feature.description || (
+                      <span className="text-gray-400 italic">No description available</span>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -291,6 +381,7 @@ export default function FeatureList() {
                   className="w-full border rounded px-3 py-2"
                   value={addForm.category}
                   onChange={e => setAddForm(f => ({ ...f, category: e.target.value }))}
+                  placeholder="Enter category name"
                 />
               </div>
               
