@@ -632,10 +632,22 @@ export default function CustomerDetailPage() {
     setLoading(true);
     setError(null);
     
+    // Validate customerId
+    if (!customerId || customerId.trim() === '') {
+      console.error('Invalid customer ID in loadCustomerData:', customerId);
+      setError('Invalid customer ID provided');
+      setLoading(false);
+      return;
+    }
+    
+    console.log('Starting to load customer data for ID:', customerId);
+    
     // Load available companies for contact form
     await loadAvailableCompanies();
     
     try {
+      console.log('Fetching customer with ID:', customerId);
+      
       // Fetch customer details - explicitly include all fields we need including business development metrics
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
@@ -651,6 +663,8 @@ export default function CustomerDetailPage() {
         `)
         .eq('id', customerId)
         .single();
+      
+      console.log('Customer query result:', { customerData, customerError });
       
       if (customerError) throw customerError;
       if (!customerData) throw new Error('Customer not found');
@@ -711,8 +725,15 @@ export default function CustomerDetailPage() {
       // Fetch customer contacts
       await loadCustomerContacts();
     } catch (err: any) {
-      console.error('Error loading customer data:', err);
-      setError(err.message || 'Failed to load customer data');
+      console.error('Error loading customer data:', {
+        error: err,
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint,
+        code: err?.code,
+        customerId
+      });
+      setError(err?.message || err?.details || err?.hint || 'Failed to load customer data');
     } finally {
       setLoading(false);
     }
@@ -1074,9 +1095,14 @@ export default function CustomerDetailPage() {
 
   // Load customer data when customerId changes
   useEffect(() => {
-    if (customerId) {
+    if (customerId && customerId.trim() !== '') {
+      console.log('Loading customer data for ID:', customerId);
       loadCustomerData();
       loadDeals();
+    } else {
+      console.error('Invalid customer ID:', customerId);
+      setError('Invalid customer ID provided');
+      setLoading(false);
     }
   }, [customerId]);
 

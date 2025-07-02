@@ -314,7 +314,7 @@ export const CustomerEditTab: React.FC<CustomerEditTabProps> = ({
     if (!acc[category]) acc[category] = [];
     acc[category].push(column);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, typeof tableColumns>);
 
   if (loading) {
     return (
@@ -389,7 +389,7 @@ export const CustomerEditTab: React.FC<CustomerEditTabProps> = ({
               {category}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {columns.map((column) => (
+              {(columns as typeof tableColumns).map((column: typeof tableColumns[0]) => (
                 <div key={column.name}>
                   {renderField(column)}
                 </div>
