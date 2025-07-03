@@ -16,7 +16,7 @@ Create or update your `.env.local`:
 # Supabase (you already have these)
 NEXT_PUBLIC_SUPABASE_URL=https://qjvyjnepemhekqnbfmzm.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_ke
 
 # Clerk (you already have these)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
