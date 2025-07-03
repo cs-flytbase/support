@@ -1,5 +1,6 @@
 'use client';
 
+import MinimalistDock from "@/components/ui/minimal-dock";
 import React, { useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { createClient } from '@/utils/supabase/client';
@@ -63,10 +64,14 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // Render the protected content
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
-      <main className="container mx-auto py-4 px-3 sm:py-6 sm:px-4 md:px-6 lg:px-8 overflow-y-auto ">
+     <div className="  flex-col items-center justify-center h-screen text-white bg-transparent">
         {children}
-      </main>
+     </div>
+   
+
+       
+     
+     
       <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
     </div>
   );

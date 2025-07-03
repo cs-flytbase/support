@@ -1,0 +1,812 @@
+# 🚀 Complete Gmail & Calendar Sync Setup Guide
+
+## 📦 1. Install Dependencies
+
+```bash
+npm install googleapis openai @supabase/supabase-js
+npm install @clerk/nextjs @clerk/clerk-sdk-node
+npm install -D @types/node
+```
+
+## 🔧 2. Environment Variables
+
+Create or update your `.env.local`:
+
+```env
+# Supabase (you already have these)
+NEXT_PUBLIC_SUPABASE_URL=https://qjvyjnepemhekqnbfmzm.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Clerk (you already have these)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+
+# OpenAI for embeddings
+OPENAI_API_KEY=your_openai_api_key
+
+# Security tokens
+CRON_SECRET=your_random_cron_secret_key_here
+INTERNAL_API_TOKEN=your_internal_api_token_here
+```
+
+## 📁 3. File Structure
+
+Create this exact file structure in your Next.js project:
+
+```
+app/
+├── api/
+│   ├── sync/
+│   │   ├── gmail/
+│   │   │   ├── initial/route.ts
+│   │   │   └── incremental/route.ts
+│   │   ├── calendar/
+│   │   │   ├── initial/route.ts
+│   │   │   └── incremental/route.ts
+│   │   ├── embeddings/
+│   │   │   └── process/route.ts
+│   │   └── all/route.ts
+│   ├── cron/
+│   │   ├── sync-incremental/route.ts
+│   │   ├── process-embeddings/route.ts
+│   │   └── cleanup-queue/route.ts
+│   └── trigger-sync/route.ts
+├── components/
+│   ├── SyncDashboard.tsx
+│   ├── DatabaseEmails.tsx
+│   └── DatabaseMeetings.tsx
+└── dashboard/
+    └── page.tsx
+
+lib/
+├── services/
+│   ├── gmail-sync.ts
+│   ├── calendar-sync.ts
+│   ├── google-auth.ts
+│   └── embedding-service.ts
+└── utils/
+    └── supabase.ts
+```
+
+## ⚙️ 4. Vercel Configuration
+
+Create `vercel.json` in your project root:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-incremental",
+      "schedule": "0 */30 * * * *"
+    },
+    {
+      "path": "/api/cron/process-embeddings", 
+      "schedule": "0 */15 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-queue",
+      "schedule": "0 0 2 * * *"
+    }
+  ]
+}
+```
+
+## 🗄️ 5. Database Setup
+
+The database schema from your document should already be set up. Verify these tables exist:
+- `users`
+- `user_integrations` 
+- `email`
+- `calendar_events`
+- `embedding_queue`
+- `customers`
+- `customer_contacts`
+
+## 🔑 6. API Keys Setup
+
+### OpenAI API Key
+1. Go to [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Create a new API key
+3. Add credits to your account ($10+ recommended)
+4. Add to `.env.local` as `OPENAI_API_KEY`
+
+### Cron Secret (Security)
+Generate a random string for cron job authentication:
+```bash
+# Generate random secret
+openssl rand -base64 32
+```
+Add to `.env.local` as `CRON_SECRET`
+
+### Internal API Token
+Generate another random string:
+```bash
+openssl rand -base64 32
+```
+Add to `.env.local` as `INTERNAL_API_TOKEN`
+
+## 🚀 7. Testing Your Setup
+
+### 1. Test Manual Sync
+Visit your dashboard and click "Full Sync" to test the initial sync.
+
+### 2. Test Individual Components
+```bash
+# Test Gmail sync
+curl -X POST http://localhost:3000/api/sync/gmail/initial \
+  -H "Content-Type: application/json" \
+  -d '{"daysBack": 30}'
+
+# Test Calendar sync  
+curl -X POST http://localhost:3000/api/sync/calendar/initial \
+  -H "Content-Type: application/json" \
+  -d '{"daysBack": 30}'
+
+# Test embedding processing
+curl -X POST http://localhost:3000/api/sync/embeddings/process \
+  -H "Content-Type: application/json" \
+  -d '{"batchSize": 5}'
+```
+
+### 3. Check Database
+Verify data is being inserted:
+```sql
+-- Check emails
+SELECT COUNT(*) FROM email;
+SELECT sender_email, subject FROM email LIMIT 5;
+
+-- Check calendar events
+SELECT COUNT(*) FROM calendar_events;
+SELECT summary, start_time FROM calendar_events LIMIT 5;
+
+-- Check embedding queue
+SELECT status, COUNT(*) FROM embedding_queue GROUP BY status;
+```
+
+## 📊 8. Monitoring
+
+### View Sync Dashboard
+- Go to `/dashboard` in your app
+- Check sync status and embedding queue
+- Trigger manual syncs as needed
+
+### Check Logs
+- Vercel dashboard for cron job logs
+- Browser network tab for API responses
+- Console logs for debugging
+
+## 🔄 9. Automation Schedule
+
+Your system will automatically:
+- **Every 30 minutes**: Incremental sync for all users
+- **Every 15 minutes**: Process embedding queue
+- **Daily at 2 AM**: Clean up old queue items
+
+## 🛠️ 10. Customization Options
+
+### Sync Frequency
+Edit `vercel.json` cron schedules:
+- More frequent: `"0 */15 * * * *"` (every 15 min)
+- Less frequent: `"0 0 */2 * * *"` (every 2 hours)
+
+### Data Retention
+Modify sync ranges in the services:
+```typescript
+// In gmail-sync.ts and calendar-sync.ts
+const daysBack = 365 // Change this value
+```
+
+### Embedding Models
+Switch OpenAI models in `embedding-service.ts`:
+```typescript
+model: 'text-embedding-3-large' // More accurate but expensive
+model: 'text-embedding-3-small' // Faster and cheaper (current)
+```
+
+## 🚨 11. Troubleshooting
+
+### Common Issues:
+
+1. **"OAuth token not found"**
+   - User needs to reconnect Gmail/Calendar in Clerk
+   - Check OAuth scopes in Clerk dashboard
+
+2. **"Rate limit exceeded"**
+   - Normal - the system has built-in retry logic
+   - Reduce batch sizes if persistent
+
+3. **"OpenAI credits exhausted"**
+   - Add credits to OpenAI account
+   - Embeddings cost ~$0.10 per 1M tokens
+
+4. **Empty sync results**
+   - Check API permissions in Google workspace
+   - Verify user has emails/events in date range
+
+### Debug Mode:
+Add to your API routes for detailed logging:
+```typescript
+console.log('Debug info:', { userId, syncType, results })
+```
+
+## 🎯 12. Next Steps
+
+After setup is complete:
+
+1. **Test with real data**: Run initial sync with your Gmail/Calendar
+2. **Monitor performance**: Check sync times and embedding generation
+3. **Add customer linking**: Connect emails/meetings to your existing customers
+4. **Build AI features**: Use the embeddings for semantic search and insights
+5. **Scale optimization**: Add indexes and optimize queries as data grows
+
+## 💡 13. Usage Tips
+
+### For Users:
+- Initial sync may take 10-30 minutes depending on email volume
+- Incremental syncs are much faster (1-5 minutes)
+- Embeddings enable AI search across all your data
+
+### For Development:
+- Use manual triggers during development
+- Monitor embedding queue to ensure processing
+- Customer linking improves over time as you add more contacts
+
+Your Gmail and Calendar sync system is now ready! 🎉
+
+---
+
+## 📞 What's Next?
+
+After this sync is working, you mentioned wanting to:
+1. **Connect emails/meetings to HubSpot deals** - We can build deal linking logic
+2. **Start AI chats about emails/meetings** - We can create chat interfaces
+3. **Create snippets and ideation boards** - We can build the snippet system
+4. **Generate proposals/handbooks** - We can add document generation
+
+Let me know which feature you'd like to tackle next!
+
+---
+
+# 🗄️ Database ERD - Entity Relationship Diagram
+
+This comprehensive ERD shows the complete database schema for your support system, including all relationships between tables for customers, communications, deals, agents, and integrations.
+
+```mermaid
+erDiagram
+    %% Core User and Identity Management
+    users {
+        uuid id PK
+        text clerk_id UK
+        text email UK
+        text full_name
+        text avatar_url
+        text role
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Customer Management
+    customers {
+        uuid id PK
+        text name
+        text email
+        text website
+        text phone
+        text address
+        text industry
+        text status
+        integer health_score
+        bigint hubspot_company_id UK
+        uuid primary_contact_id FK
+        uuid assigned_agent_id FK
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    customer_contacts {
+        uuid id PK
+        uuid customer_id FK
+        text name
+        text email UK
+        text phone
+        text title
+        boolean is_primary
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Agents and Performance
+    agents {
+        uuid id PK
+        text name
+        text email UK
+        text phone
+        text role
+        text title
+        text status
+        date hire_date
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    agent_performance_metrics {
+        uuid id PK
+        uuid agent_id FK
+        date period_start
+        date period_end
+        integer calls_handled
+        numeric avg_call_duration
+        numeric avg_customer_sentiment
+        integer avg_call_quality_score
+        jsonb improvement_areas
+        jsonb strengths
+        timestamp created_at
+    }
+
+    %% Deals and Sales
+    deals {
+        uuid id PK
+        varchar hubspot_deal_id UK
+        varchar deal_name
+        numeric amount
+        varchar currency
+        varchar deal_stage
+        varchar status
+        date close_date
+        uuid customer_id FK
+        boolean is_closed_won
+        boolean is_closed_lost
+        jsonb hubspot_metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    deal_contacts {
+        uuid id PK
+        uuid deal_id FK
+        uuid contact_id FK
+        varchar role
+        varchar hubspot_contact_id
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    deal_customers {
+        uuid id PK
+        uuid deal_id FK
+        uuid customer_id FK
+        varchar relationship_type
+        varchar hubspot_association_id
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Communication - Calls
+    calls {
+        uuid id PK
+        text external_id
+        text name
+        uuid customer_id FK
+        numeric duration
+        text meeting_url
+        text recording_url
+        text notes
+        jsonb transcript
+        jsonb action_items
+        timestamp scheduled_start_time
+        timestamp actual_start_time
+        timestamp end_time
+        text embedding_text
+        vector embedding
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    call_participants {
+        uuid id PK
+        uuid call_id FK
+        text participant_type
+        uuid agent_id FK
+        uuid contact_id FK
+        text role
+        text name
+        timestamp joined_at
+        timestamp left_at
+        jsonb metadata
+        timestamp created_at
+    }
+
+    call_analysis {
+        uuid id PK
+        uuid call_id FK
+        numeric overall_sentiment
+        numeric customer_sentiment
+        integer call_quality_score
+        text resolution_status
+        integer resolution_time_seconds
+        text call_summary
+        text sentiment_narrative
+        jsonb expansion_opportunities
+        jsonb product_feedback
+        timestamp analyzed_at
+        jsonb metadata
+    }
+
+    utterances {
+        uuid id PK
+        uuid call_id FK
+        uuid participant_id FK
+        text text
+        numeric timestamp
+        numeric duration_seconds
+        text participant_name
+        jsonb metadata
+        timestamp created_at
+    }
+
+    utterance_analysis {
+        uuid id PK
+        uuid utterance_id FK
+        numeric sentiment_score
+        text emotion
+        text intent
+        boolean is_question
+        boolean is_important
+        timestamp analyzed_at
+        jsonb metadata
+    }
+
+    %% Communication - Email
+    email {
+        bigint id PK
+        text sender_email
+        uuid company_id FK
+        uuid contact_id FK
+        text email_body
+        text subject
+        real sentiment
+        text google_message_id UK
+        text thread_id
+        boolean is_read
+        jsonb labels
+        timestamp received_at
+        uuid chat_id FK
+        text embedding_text
+        vector embedding
+        timestamp created_at
+    }
+
+    %% Communication - Slack
+    slack_channels {
+        uuid id PK
+        uuid user_id FK
+        varchar channel_id UK
+        varchar channel_name
+        boolean is_private
+        uuid customer_id FK
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    slack_messages {
+        uuid id PK
+        uuid user_id FK
+        uuid channel_id FK
+        varchar slack_message_id UK
+        varchar user_slack_id
+        text text
+        timestamp timestamp
+        varchar thread_ts
+        boolean is_bot
+        uuid customer_id FK
+        text embedding_text
+        vector embedding
+        timestamp created_at
+    }
+
+    %% Calendar Events
+    calendar_events {
+        uuid id PK
+        uuid user_id FK
+        varchar google_event_id UK
+        text summary
+        text description
+        timestamp start_time
+        timestamp end_time
+        jsonb attendees
+        uuid customer_id FK
+        text meeting_url
+        varchar status
+        uuid preparation_chat_id FK
+        boolean is_synced
+        text embedding_text
+        vector embedding
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Chat and AI
+    chats {
+        uuid id PK
+        uuid user_id FK
+        text title
+        varchar context_type
+        uuid context_id
+        uuid customer_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    chat_messages {
+        uuid id PK
+        uuid chat_id FK
+        varchar role
+        text content
+        jsonb metadata
+        timestamp created_at
+    }
+
+    ai_agents {
+        uuid id PK
+        uuid user_id FK
+        text name
+        text webhook_url
+        text description
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Conversations and Messages
+    conversations {
+        uuid id PK
+        uuid user_id FK
+        text platform_type
+        text chat_id
+        text title
+        boolean is_group
+        jsonb participants
+        text status
+        uuid customer_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    conversation_members {
+        uuid id PK
+        uuid conversation_id FK
+        text external_id
+        text name
+        boolean is_admin
+        text type
+        uuid contact_id FK
+        uuid agent_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    messages {
+        uuid id PK
+        uuid conversation_id
+        text topic
+        text platform_message_id
+        text sender_id
+        text extension
+        jsonb payload
+        text content
+        boolean is_read
+        timestamp inserted_at
+        timestamp created_at
+    }
+
+    %% Issues and Topics
+    topics {
+        uuid id PK
+        text name UK
+        text description
+        integer priority
+        text category
+        boolean is_active
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    issues {
+        uuid id PK
+        uuid topic_id FK
+        text title
+        text description
+        integer frequency
+        text priority
+        text status
+        integer impact_score
+        timestamp first_identified
+        timestamp resolved_at
+        uuid created_by_customer_id FK
+        uuid assigned_to_agent_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    customer_issues {
+        uuid id PK
+        uuid issue_id FK
+        uuid customer_id FK
+        varchar customer_status
+        varchar customer_priority
+        varchar business_impact
+        timestamp requested_date
+        timestamp acknowledged_date
+        timestamp resolved_date
+        text customer_notes
+        text internal_notes
+        boolean is_blocking
+        boolean workaround_available
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Integrations and API
+    api_keys {
+        uuid id PK
+        uuid user_id FK
+        text platform
+        text api_key
+        text api_secret
+        boolean is_active
+        text name
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    user_integrations {
+        uuid id PK
+        uuid user_id FK
+        varchar platform
+        text access_token
+        text refresh_token
+        timestamp expires_at
+        text scope
+        boolean is_active
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Features and Documentation
+    features {
+        uuid id PK
+        text product
+        text feature_name
+        text description
+        text category
+        text use_case
+        text integration_type
+        text value_proposition
+        text behaviour
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    feature_images {
+        uuid id PK
+        uuid feature_id FK
+        text name
+        text description
+        text link
+        text image_description_embedding
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    knowledge_bases {
+        uuid id PK
+        text title
+        text description
+        text type
+        text link
+        text release_dates
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    knowledge_base_items {
+        uuid id PK
+        uuid knowledge_base_id
+        text title
+        text content
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Relationships
+    users ||--o{ customers : "manages"
+    users ||--o{ ai_agents : "owns"
+    users ||--o{ chats : "creates"
+    users ||--o{ conversations : "participates"
+    users ||--o{ calendar_events : "schedules"
+    users ||--o{ slack_channels : "manages"
+    users ||--o{ user_integrations : "configures"
+    users ||--o{ api_keys : "manages"
+
+    customers ||--o{ customer_contacts : "has"
+    customers ||--o{ deals : "associated_with"
+    customers ||--o{ calls : "participates_in"
+    customers ||--o{ customer_issues : "reports"
+    customers ||--o{ email : "sends"
+    customers ||--o{ slack_messages : "sends"
+    customers ||--o{ calendar_events : "attends"
+    customers ||--o{ chats : "discusses"
+    customers ||--o{ conversations : "participates"
+    customers ||--o{ issues : "creates"
+    customers ||--o{ agents : "assigned_to"
+    customer_contacts ||--o{ customers : "primary_contact"
+
+    agents ||--o{ agent_performance_metrics : "measured_by"
+    agents ||--o{ call_participants : "participates"
+    agents ||--o{ conversation_members : "represents"
+    agents ||--o{ issues : "assigned_to"
+
+    deals ||--o{ deal_contacts : "involves"
+    deals ||--o{ deal_customers : "relates_to"
+    customer_contacts ||--o{ deal_contacts : "participates_in"
+
+    calls ||--o{ call_participants : "includes"
+    calls ||--|| call_analysis : "analyzed_by"
+    calls ||--o{ utterances : "contains"
+    call_participants ||--o{ utterances : "speaks"
+    utterances ||--o{ utterance_analysis : "analyzed_by"
+
+    chats ||--o{ chat_messages : "contains"
+    chats ||--o{ email : "discussed_in"
+    chats ||--o{ calendar_events : "preparation_for"
+    conversations ||--o{ conversation_members : "includes"
+    conversations ||--o{ messages : "contains"
+
+    slack_channels ||--o{ slack_messages : "contains"
+
+    topics ||--o{ issues : "categorizes"
+    issues ||--o{ customer_issues : "reported_as"
+
+    features ||--o{ feature_images : "illustrated_by"
+    knowledge_bases ||--o{ knowledge_base_items : "contains"
+```
+
+## 📊 Database Overview
+
+This ERD represents a comprehensive customer support and relationship management system with the following key areas:
+
+### 🔑 Core Entities:
+- **Users**: Clerk-authenticated users managing the system
+- **Customers**: Companies/organizations being supported
+- **Agents**: Support staff and team members
+- **Deals**: Sales opportunities and transactions
+
+### 💬 Communication Channels:
+- **Email**: Gmail sync with sentiment analysis and AI embeddings
+- **Calendar Events**: Google Calendar integration with meeting preparation
+- **Calls**: Voice interactions with full analysis and transcription
+- **Slack**: Team collaboration and customer channels
+- **Chat**: AI-powered conversations and support threads
+
+### 🤖 AI & Intelligence:
+- **Embeddings**: Vector search across all communications
+- **Analysis**: Sentiment, intent, and conversation insights
+- **AI Agents**: Automated support and response systems
+- **Knowledge Base**: Documentation and solution handbooks
+
+### 🔗 Integrations:
+- **Google Workspace**: Gmail, Calendar, Drive
+- **HubSpot**: CRM synchronization and deal tracking
+- **Slack**: Team communication platform
+- **OpenAI**: Embeddings and AI analysis
+
+The system is designed to provide a 360-degree view of customer interactions across all channels while enabling AI-powered insights and automation.

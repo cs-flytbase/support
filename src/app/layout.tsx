@@ -9,6 +9,7 @@ import {
   SignedOut,
   UserButton,
 } from '@clerk/nextjs'
+import { ThemeProvider } from "@/components/theme-provider";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -32,7 +33,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased `}>
         {/* <header className="flex justify-end items-center p-4 gap-4 h-16">
           <SignedOut>
             <SignInButton />
@@ -42,7 +43,15 @@ export default function RootLayout({
             <UserButton />
           </SignedIn>
         </header> */}
-        {children}
+<ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+          
       </body>
     </html>
   </ClerkProvider>

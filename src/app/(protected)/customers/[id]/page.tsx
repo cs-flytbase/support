@@ -516,6 +516,7 @@ export default function CustomerDetailPage() {
         const { error } = await supabase
           .from('customer_contacts')
           .update({
+            customer_id: contactFormData.customer_id || customerId,
             name: contactFormData.name,
             email: contactFormData.email || null,
             phone: contactFormData.phone || null,
