@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
+import { motion, useReducedMotion, AnimatePresence, Variants } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 
 export interface Character {
@@ -148,7 +148,7 @@ export function MessageDock({
     };
   }, [closeOnClickOutside, onDockToggle]);
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: {
       opacity: 0,
       y: 100,
@@ -346,7 +346,7 @@ export function MessageDock({
                       : character.backgroundColor
                   )}
                   onClick={() => handleCharacterClick(actualIndex)}
-                  whileHover={!isExpanded ? hoverAnimation : { scale: 1.05 }}
+                  whileHover={!isExpanded ? hoverAnimation : { scale: 1.05 } as any}
                   whileTap={{ scale: 0.95 }}
                   aria-label={`Message ${character.name}`}
                 >

@@ -1,6 +1,7 @@
 // lib/services/gmail-sync.ts
 import { GoogleAuthHelper } from './google-auth'
 import { syncHelpers } from './sync-helpers'
+import { embeddingService } from './embedding-service'
 import { gmail_v1 } from 'googleapis'
 
 export class GmailSyncService {
@@ -204,8 +205,15 @@ export class GmailSyncService {
     
     // Batch insert emails
     if (emailsToInsert.length > 0) {
-      await syncHelpers.batchInsertEmails(emailsToInsert)
+      const insertedEmails = await syncHelpers.batchInsertEmails(emailsToInsert)
       console.log(`Inserted ${emailsToInsert.length} new emails`)
+      
+      // Queue emails for embedding generation
+      for (const email of insertedEmails) {
+        if (email.embedding_text) {
+          await embeddingService.queueForEmbedding('email', email.id, email.embedding_text)
+        }
+      }
     }
     
     return processedCount

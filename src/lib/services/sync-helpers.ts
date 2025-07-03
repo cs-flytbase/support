@@ -47,6 +47,32 @@ export const syncHelpers = {
     return data
   },
 
+  // Get all users with active integrations
+  async getUsersWithActiveIntegrations() {
+    const supabase = createAdminClient()
+    
+    // First get user IDs with active integrations
+    const { data: integrationData, error: intError } = await supabase
+      .from('user_integrations')
+      .select('user_id')
+      .eq('is_active', true)
+    
+    if (intError) throw intError
+    if (!integrationData || integrationData.length === 0) return []
+    
+    // Get unique user IDs
+    const userIds = [...new Set(integrationData.map(i => i.user_id))]
+    
+    // Get users with those IDs
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, clerk_user_id, email')
+      .in('id', userIds)
+    
+    if (error) throw error
+    return data
+  },
+
   // Update integration sync status
   async updateIntegrationSync(userId: string, platform: string, metadata: any) {
     const supabase = createAdminClient()

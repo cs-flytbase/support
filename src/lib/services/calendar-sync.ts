@@ -1,6 +1,7 @@
 // lib/services/calendar-sync.ts
 import { GoogleAuthHelper } from './google-auth'
 import { syncHelpers } from './sync-helpers'
+import { embeddingService } from './embedding-service'
 import { calendar_v3 } from 'googleapis'
 
 export class CalendarSyncService {
@@ -318,8 +319,15 @@ export class CalendarSyncService {
     
     // Batch operations
     if (eventsToInsert.length > 0) {
-      await syncHelpers.batchInsertCalendarEvents(eventsToInsert)
+      const insertedEvents = await syncHelpers.batchInsertCalendarEvents(eventsToInsert)
       console.log(`Inserted ${eventsToInsert.length} new events`)
+      
+      // Queue events for embedding generation
+      for (const event of insertedEvents) {
+        if (event.embedding_text) {
+          await embeddingService.queueForEmbedding('calendar_event', event.id, event.embedding_text)
+        }
+      }
     }
     
     if (eventsToUpdate.length > 0) {

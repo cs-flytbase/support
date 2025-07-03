@@ -1,7 +1,7 @@
 // components/SyncDashboard.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, Mail, Calendar, CheckCircle, AlertCircle } from 'lucide-react'
 
@@ -14,10 +14,19 @@ interface SyncResult {
   }
 }
 
+interface EmbeddingStats {
+  pending: number
+  processing: number
+  completed: number
+  failed: number
+}
+
 export default function SyncDashboard() {
   const [isLoading, setIsLoading] = useState(false)
   const [lastSync, setLastSync] = useState<Date | null>(null)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
+  const [embeddingStats, setEmbeddingStats] = useState<EmbeddingStats | null>(null)
+  const [isProcessingEmbeddings, setIsProcessingEmbeddings] = useState(false)
 
   // Trigger manual sync
   const triggerSync = async (syncType: 'full' | 'incremental') => {
@@ -25,7 +34,7 @@ export default function SyncDashboard() {
     setSyncResult(null)
     
     try {
-      const response = await fetch('/api/sync/all', {
+      const response = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ syncType })
@@ -34,6 +43,9 @@ export default function SyncDashboard() {
       const result = await response.json()
       setSyncResult(result)
       setLastSync(new Date())
+      
+      // Refresh embedding stats after sync
+      await fetchEmbeddingStats()
       
     } catch (error) {
       console.error('Sync failed:', error)
@@ -45,6 +57,52 @@ export default function SyncDashboard() {
       setIsLoading(false)
     }
   }
+
+  // Fetch embedding queue statistics
+  const fetchEmbeddingStats = async () => {
+    try {
+      const response = await fetch('/api/sync/embeddings')
+      const result = await response.json()
+      if (result.success) {
+        setEmbeddingStats(result.stats)
+      }
+    } catch (error) {
+      console.error('Failed to fetch embedding stats:', error)
+    }
+  }
+
+  // Process embedding queue manually
+  const processEmbeddings = async () => {
+    setIsProcessingEmbeddings(true)
+    
+    try {
+      const response = await fetch('/api/sync/embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batchSize: 10 })
+      })
+      
+      const result = await response.json()
+      if (result.success) {
+        console.log(`Processed ${result.processed} embeddings`)
+        await fetchEmbeddingStats()
+      }
+      
+    } catch (error) {
+      console.error('Failed to process embeddings:', error)
+    } finally {
+      setIsProcessingEmbeddings(false)
+    }
+  }
+
+  // Load embedding stats on component mount
+  useEffect(() => {
+    fetchEmbeddingStats()
+    
+    // Refresh stats every 30 seconds
+    const interval = setInterval(fetchEmbeddingStats, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -76,10 +134,55 @@ export default function SyncDashboard() {
             Full Sync
           </Button>
         </div>
+
+        {/* Embedding Queue Status */}
+        <div className="bg-white rounded-lg border p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-purple-600" />
+              AI Embeddings
+            </h3>
+            <Button
+              onClick={processEmbeddings}
+              disabled={isProcessingEmbeddings}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw className={`w-3 h-3 mr-1 ${isProcessingEmbeddings ? 'animate-spin' : ''}`} />
+              Process
+            </Button>
+          </div>
+          <div className="text-xs text-gray-600 space-y-1">
+            {embeddingStats ? (
+              <>
+                <div className="flex justify-between">
+                  <span>Pending:</span>
+                  <span className="font-medium text-orange-600">{embeddingStats.pending}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Processing:</span>
+                  <span className="font-medium text-blue-600">{embeddingStats.processing}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Completed:</span>
+                  <span className="font-medium text-green-600">{embeddingStats.completed}</span>
+                </div>
+                {embeddingStats.failed > 0 && (
+                  <div className="flex justify-between">
+                    <span>Failed:</span>
+                    <span className="font-medium text-red-600">{embeddingStats.failed}</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <span>Loading stats...</span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Sync Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Gmail Status */}
         <div className="bg-white rounded-lg border p-4">
           <div className="flex items-center justify-between mb-2">
