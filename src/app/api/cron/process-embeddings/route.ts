@@ -3,12 +3,10 @@ import { embeddingService } from '@/lib/services/embedding-service'
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify cron secret
-    const body = await request.json().catch(() => ({}))
-    const { cronSecret } = body
-
-    if (cronSecret !== process.env.CRON_SECRET) {
-      return NextResponse.json({ error: 'Invalid cron secret' }, { status: 401 })
+    // Verify cron secret from Authorization header (Vercel format)
+    const authHeader = request.headers.get('authorization')
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     console.log('Starting automated embedding processing')

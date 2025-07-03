@@ -10,9 +10,13 @@ export async function POST(request: NextRequest) {
       cronSecret 
     } = body
 
-    // Verify cron secret for automated processing
+    // Verify cron secret for automated processing (support both formats)
+    const authHeader = request.headers.get('authorization')
     if (cronSecret && cronSecret !== process.env.CRON_SECRET) {
       return NextResponse.json({ error: 'Invalid cron secret' }, { status: 401 })
+    }
+    if (authHeader && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     console.log(`Processing embedding queue with batch size: ${batchSize}`)
