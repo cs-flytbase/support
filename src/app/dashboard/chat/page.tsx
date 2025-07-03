@@ -262,7 +262,7 @@ function PromptInputAction({
 }
 
 // Main Chat Interface Component
-export function ChatInterface() {
+function ChatInterface() {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [leftSidebarView, setLeftSidebarView] = useState<"chats" | "assets">("chats");
