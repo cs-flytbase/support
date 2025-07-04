@@ -3,9 +3,20 @@ import { createClient } from '@supabase/supabase-js'
 
 // Use regular supabase-js client for server-side operations with service role
 const createAdminClient = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL is required')
+  }
+  
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required. Please add it to your .env file.')
+  }
+  
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!, // Service role key for admin operations
+    supabaseUrl,
+    serviceRoleKey,
     {
       auth: {
         autoRefreshToken: false,
