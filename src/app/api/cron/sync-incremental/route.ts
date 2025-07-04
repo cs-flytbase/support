@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     // Process each user
     for (const user of users) {
       try {
-        console.log(`Processing user: ${user.clerk_user_id}`)
+        console.log(`Processing user: ${user.clerk_id}`)
         
         // Check what integrations this user has
         const integrations = await syncHelpers.getUserIntegrations(user.id)
@@ -46,13 +46,13 @@ export async function POST(request: NextRequest) {
         const gmailIntegration = integrations.find(i => i.platform === 'gmail' && i.is_active)
         if (gmailIntegration) {
           try {
-            const gmailSync = new GmailSyncService(user.clerk_user_id, user.id)
+            const gmailSync = new GmailSyncService(user.clerk_id, user.id)
             await gmailSync.performIncrementalSync()
             results.gmailSyncs++
-            console.log(`Gmail sync completed for user ${user.clerk_user_id}`)
+            console.log(`Gmail sync completed for user ${user.clerk_id}`)
           } catch (error: any) {
-            console.error(`Gmail sync failed for user ${user.clerk_user_id}:`, error)
-            results.errors.push(`Gmail sync failed for user ${user.clerk_user_id}: ${error.message}`)
+            console.error(`Gmail sync failed for user ${user.clerk_id}:`, error)
+            results.errors.push(`Gmail sync failed for user ${user.clerk_id}: ${error.message}`)
           }
         }
 
@@ -60,13 +60,13 @@ export async function POST(request: NextRequest) {
         const calendarIntegration = integrations.find(i => i.platform === 'google_calendar' && i.is_active)
         if (calendarIntegration) {
           try {
-            const calendarSync = new CalendarSyncService(user.clerk_user_id, user.id)
+            const calendarSync = new CalendarSyncService(user.clerk_id, user.id)
             await calendarSync.performIncrementalSync()
             results.calendarSyncs++
-            console.log(`Calendar sync completed for user ${user.clerk_user_id}`)
+            console.log(`Calendar sync completed for user ${user.clerk_id}`)
           } catch (error: any) {
-            console.error(`Calendar sync failed for user ${user.clerk_user_id}:`, error)
-            results.errors.push(`Calendar sync failed for user ${user.clerk_user_id}: ${error.message}`)
+            console.error(`Calendar sync failed for user ${user.clerk_id}:`, error)
+            results.errors.push(`Calendar sync failed for user ${user.clerk_id}: ${error.message}`)
           }
         }
 
@@ -76,9 +76,9 @@ export async function POST(request: NextRequest) {
         await new Promise(resolve => setTimeout(resolve, 1000))
 
       } catch (error: any) {
-        console.error(`Error processing user ${user.clerk_user_id}:`, error)
+        console.error(`Error processing user ${user.clerk_id}:`, error)
         results.failedSyncs++
-        results.errors.push(`User ${user.clerk_user_id}: ${error.message}`)
+        results.errors.push(`User ${user.clerk_id}: ${error.message}`)
       }
     }
 

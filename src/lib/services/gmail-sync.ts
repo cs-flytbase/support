@@ -299,23 +299,35 @@ export class GmailSyncService {
     return {
       user_id: this.dbUserId,
       customer_id: customerId,
-      google_message_id: message.id,
+      message_id: message.id, // Use message_id as per table schema
+      google_message_id: message.id, // Also store as google_message_id for sync tracking
       thread_id: message.threadId,
       sender_email: senderEmail.toLowerCase(),
       sender_name: senderName,
-      recipient_emails: JSON.stringify(allRecipients),
+      recipient_emails: allRecipients.map(r => r.email), // Store as array, not JSON string
+      cc_emails: ccHeader ? ccHeader.split(',').map(e => e.trim()) : [],
+      bcc_emails: bccHeader ? bccHeader.split(',').map(e => e.trim()) : [],
       subject: subject,
       content: content,
       html_content: htmlContent,
       snippet: snippet,
       is_read: !labelIds.includes('UNREAD'),
       is_important: labelIds.includes('IMPORTANT'),
-      labels: JSON.stringify(labelIds),
-      received_at: receivedAt.toISOString(),
-      sent_at: emailType === 'sent' ? receivedAt.toISOString() : null,
+      is_draft: emailType === 'draft',
+      is_sent: emailType === 'sent',
+      labels: labelIds, // Store as array, not JSON string
+      date_received: receivedAt.toISOString(), // Use date_received as per table schema
+      received_at: receivedAt.toISOString(), // Also store as received_at
+      date_sent: emailType === 'sent' ? receivedAt.toISOString() : null, // Use date_sent as per table schema
+      sent_at: emailType === 'sent' ? receivedAt.toISOString() : null, // Also store as sent_at
       email_type: emailType,
-      raw_email_data: JSON.stringify(message),
+      raw_email_data: message, // Store as JSONB, not JSON string
+      raw_payload: message.payload || {}, // Store raw payload separately
+      raw_headers: headers.reduce((acc: any, h) => { acc[h.name || ''] = h.value; return acc; }, {}),
       embedding_text: embeddingText,
+      has_attachments: (message.payload?.parts || []).some(part => part.filename && part.filename.length > 0),
+      attachment_count: (message.payload?.parts || []).filter(part => part.filename && part.filename.length > 0).length,
+      gmail_history_id: message.historyId ? parseInt(message.historyId) : null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }

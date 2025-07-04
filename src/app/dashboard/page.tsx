@@ -5,6 +5,7 @@ import { GooeyDemo } from "@/components/Gooye";
 import { NavBar } from "@/components/ui/tubelight-navbar";
 import MessageDoc from "./components/MessageDoc";
 import { AppDoc } from "./components/IconDoc";
+import SyncDashboard from "./components/SyncDashboard";
 
 
 // export default function Page() {
@@ -42,9 +43,12 @@ export default function Page() {
           <AppSidebar />
           <SidebarInset>
             <div className="flex flex-1 flex-col gap-4 p-4">
-            <GooeyDemo />
-            <MessageDoc />
+              <div className="bg-white rounded-lg p-6">
+                <SyncDashboard />
               </div>
+              <GooeyDemo />
+              <MessageDoc />
+            </div>
           </SidebarInset>
         </div>
       </SidebarProvider>

@@ -93,11 +93,12 @@ export async function GET(request: NextRequest) {
     
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    const { data: events, error } = await supabase
+    const { data: dbEvents, error } = await supabase
       .from('calendar_events')
       .select('*')
       .eq('user_id', dbUser.id)
-      .order('start_time', { ascending: false })
+      .gte('start_time', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // Last 30 days
+      .order('start_time', { ascending: true })
       .limit(50)
 
     if (error) {
@@ -105,10 +106,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch calendar events' }, { status: 500 })
     }
 
+    // Transform database events to match the expected frontend structure
+    const transformedEvents = (dbEvents || []).map((event: any) => ({
+      id: event.id,
+      summary: event.summary || 'Untitled Event',
+      start: {
+        dateTime: event.start_time,
+        timeZone: 'UTC'
+      },
+      end: {
+        dateTime: event.end_time,
+        timeZone: 'UTC'
+      },
+      attendees: event.attendees ? (typeof event.attendees === 'string' ? JSON.parse(event.attendees) : event.attendees) : [],
+      htmlLink: event.google_event_id ? `https://calendar.google.com/calendar/event?eid=${event.google_event_id}` : '#',
+      location: event.location || '',
+      conferenceData: event.conference_data ? (typeof event.conference_data === 'string' ? JSON.parse(event.conference_data) : event.conference_data) : null,
+      organizer: {
+        email: event.organizer_email || '',
+        displayName: event.organizer_name || ''
+      },
+      status: event.status || 'confirmed',
+      description: event.description || ''
+    }))
+
     return NextResponse.json({
       success: true,
-      events: events || [],
-      count: events?.length || 0
+      events: transformedEvents,
+      count: transformedEvents.length
     })
 
   } catch (error: any) {
