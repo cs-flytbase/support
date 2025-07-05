@@ -1,6 +1,7 @@
 import MinimalistDock from "@/components/ui/minimal-dock";
 import { TextShimmer } from "@/components/ui/text-shimmer";
-import InteractiveCalendar from "@/components/ui/visualize-booking";
+
+import Calendarprod from "./components/Calendarprod";
 import { GooeyDemo } from "@/components/Gooye";
 import { NavBar } from "@/components/ui/tubelight-navbar";
 import MessageDoc from "./components/MessageDoc";
@@ -18,7 +19,7 @@ import SyncDashboard from "./components/SyncDashboard";
 //         loading
 //     <TextShimmer className='font-mono text-sm' duration={1}>
 //       booting up...
-//     // </TextShimmer> 
+//     </TextShimmer> 
 //     <GooeyDemo />
 //     <GooeyDemo />
 //      <MinimalistDock />
@@ -43,11 +44,12 @@ export default function Page() {
           <AppSidebar />
           <SidebarInset>
             <div className="flex flex-1 flex-col gap-4 p-4">
-              <div className="bg-white rounded-lg p-6">
+              {/* <div className="bg-black rounded-lg p-6">
                 <SyncDashboard />
-              </div>
-              <GooeyDemo />
-              <MessageDoc />
+              </div> */}
+              {/* <GooeyDemo /> */}
+              {/* <MessageDoc /> */}
+              <Calendarprod />
             </div>
           </SidebarInset>
         </div>

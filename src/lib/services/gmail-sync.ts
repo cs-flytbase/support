@@ -16,7 +16,6 @@ export class GmailSyncService {
   // Full sync - get ALL emails from the past year
   async performFullSync(daysBack: number = 365) {
     console.log(`Starting full Gmail sync for user ${this.userId} - last ${daysBack} days`)
-    
     try {
       const gmail = await GoogleAuthHelper.createGmailClient(this.userId)
       const cutoffDate = new Date()

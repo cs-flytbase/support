@@ -216,22 +216,88 @@ export class EmbeddingService {
     }
   }
 
-  // Get queue statistics
+  // Get queue statistics (OPTIMIZED VERSION)
   async getQueueStats(): Promise<{
     pending: number
     processing: number
     completed: number
     failed: number
   }> {
+    const startTime = Date.now()
+    console.log('📊 EmbeddingService: Getting queue stats...')
+    
     try {
       const supabase = createAdminClient()
+      console.log('🔗 Supabase client created')
+      
+      // Try the optimized RPC function first
+      console.log('⚡ Attempting optimized RPC query...')
+      const rpcStart = Date.now()
+      
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_embedding_queue_stats_fast')
+      
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        const rpcTime = Date.now() - rpcStart
+        const totalTime = Date.now() - startTime
+        
+        const stats = {
+          pending: Number(rpcData[0].pending),
+          processing: Number(rpcData[0].processing),
+          completed: Number(rpcData[0].completed),
+          failed: Number(rpcData[0].failed)
+        }
+        
+        console.log(`⚡ RPC stats completed in ${rpcTime}ms (total: ${totalTime}ms):`, stats)
+        return stats
+      }
+      
+      console.log('⚠️ RPC function not available, falling back to manual count')
+      console.log('RPC Error:', rpcError)
+      
+      // Fallback to manual counting with detailed logging
+      return await this.getQueueStatsFallback()
+
+    } catch (error) {
+      const totalTime = Date.now() - startTime
+      console.error(`❌ getQueueStats failed after ${totalTime}ms:`, error)
+      
+      // Final fallback
+      return await this.getQueueStatsFallback()
+    }
+  }
+
+  // Fallback method with detailed performance logging
+  async getQueueStatsFallback(): Promise<{
+    pending: number
+    processing: number
+    completed: number
+    failed: number
+  }> {
+    const startTime = Date.now()
+    console.log('🐌 FALLBACK: Using row-by-row counting (this explains the 141ms delay!)...')
+    
+    try {
+      const supabase = createAdminClient()
+      
+      console.log('📥 Fetching ALL rows from embedding_queue...')
+      const queryStart = Date.now()
       
       const { data, error } = await supabase
         .from('embedding_queue')
         .select('status')
 
-      if (error) throw error
+      const queryTime = Date.now() - queryStart
+      const rowCount = data?.length || 0
+      console.log(`📊 Database query: ${rowCount} rows fetched in ${queryTime}ms`)
 
+      if (error) {
+        console.error('❌ Database query failed:', error)
+        throw error
+      }
+
+      console.log('🔢 Counting rows in JavaScript (the slow part)...')
+      const countStart = Date.now()
+      
       const stats = {
         pending: 0,
         processing: 0,
@@ -239,15 +305,37 @@ export class EmbeddingService {
         failed: 0
       }
 
-      data?.forEach(item => {
+      let invalidStatusCount = 0
+      data?.forEach((item, index) => {
         if (item.status in stats) {
           stats[item.status as keyof typeof stats]++
+        } else {
+          invalidStatusCount++
+        }
+        
+        // Log progress for large datasets
+        if (index % 1000 === 0 && index > 0) {
+          console.log(`   Processed ${index}/${rowCount} rows...`)
         }
       })
 
+      const countTime = Date.now() - countStart
+      const totalTime = Date.now() - startTime
+      
+      console.log(`🔢 JavaScript counting: ${countTime}ms`)
+      console.log(`📊 Total fallback time: ${totalTime}ms`)
+      console.log(`📈 Final stats:`, stats)
+      
+      if (invalidStatusCount > 0) {
+        console.warn(`⚠️ Found ${invalidStatusCount} rows with invalid status values`)
+      }
+      
+      console.log('💡 TIP: Run the SQL function creation script to improve performance!')
+      console.log('💡 Current method scales O(n) with queue size - RPC function is O(1)')
+
       return stats
     } catch (error) {
-      console.error('Error getting queue stats:', error)
+      console.error('❌ Fallback stats method failed:', error)
       throw error
     }
   }
