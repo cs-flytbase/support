@@ -48,7 +48,7 @@ export default function Page() {
                 <SyncDashboard />
               </div> */}
               {/* <GooeyDemo /> */}
-              {/* <MessageDoc /> */}
+              <MessageDoc />
               <Calendarprod />
             </div>
           </SidebarInset>
