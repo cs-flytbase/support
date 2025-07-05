@@ -2,15 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/sync-incremental",
-      "schedule": "0 */30 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/process-embeddings", 
-      "schedule": "0 */15 * * * *"
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/cron/cleanup-queue",
-      "schedule": "0 0 2 * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 } 
