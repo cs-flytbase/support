@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const dbUser = await syncHelpers.getUserByClerkId(userId)
     if (!dbUser) {
       return NextResponse.json({ 
-        error: 'User not found in database. Please complete setup first.' 
+        error: 'User not found in database. Please sign out and sign in again to complete setup.' 
       }, { status: 404 })
     }
 

@@ -1,11 +1,12 @@
 "use client"
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Calendar } from 'lucide-react';
+import { Mail, Calendar, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, subDays, getDaysInMonth, getDate } from 'date-fns';
 import { useUser } from '@clerk/nextjs';
 import { TextShimmer } from '@/components/ui/text-shimmer';
+import { showRealtimeToast } from '@/components/ui/realtime-toast';
 
 export type DayType = {
   day: string;
@@ -148,6 +149,15 @@ const Calendarprod = React.forwardRef<
   const [currentDate] = useState(new Date());
   const [dbUserId, setDbUserId] = useState<string | null>(null);
   
+  // Real-time connection state
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<string>('CLOSED');
+  const [lastSync, setLastSync] = useState<Date>(new Date());
+  
+  // Subscription refs to manage cleanup
+  const subscriptionsRef = useRef<any[]>([]);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   const supabase = createClient();
   const { user } = useUser();
 
@@ -188,28 +198,43 @@ const Calendarprod = React.forwardRef<
 
   // Fetch calendar events from Supabase (user-specific)
   const fetchCalendarEvents = useCallback(async () => {
-    if (!dbUserId) return [];
+    if (!dbUserId) {
+      console.log('⚠️ Calendar: No dbUserId, skipping calendar fetch');
+      return [];
+    }
     
     try {
       const startDate = startOfMonth(currentDate);
       const endDate = endOfMonth(currentDate);
+      
+      console.log('📊 Calendar: Fetching events for:', {
+        dbUserId,
+        currentDate: currentDate.toISOString(),
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      });
       
       const { data, error } = await supabase
         .from('calendar_events')
         .select('id, summary, description, start_time, end_time, location, attendees, organizer_name, organizer_email')
         .eq('user_id', dbUserId)
         .gte('start_time', startDate.toISOString())
-        .lte('start_time', endDate.toISOString())
+        .lt('start_time', new Date(endDate.getTime() + 24 * 60 * 60 * 1000).toISOString()) // Add 1 day to include events on the last day
         .order('start_time', { ascending: true });
 
       if (error) {
-        console.error('Error fetching calendar events:', error);
+        console.error('❌ Calendar: Error fetching calendar events:', error);
         return [];
       }
 
+      console.log('✅ Calendar: Fetched events:', {
+        count: data?.length || 0,
+        events: data?.slice(0, 3) // Log first 3 events for debugging
+      });
+
       return data || [];
     } catch (error) {
-      console.error('Error fetching calendar events:', error);
+      console.error('❌ Calendar: Exception fetching calendar events:', error);
       return [];
     }
   }, [dbUserId, currentDate, supabase]);
@@ -241,6 +266,125 @@ const Calendarprod = React.forwardRef<
       return [];
     }
   }, [dbUserId, currentDate, supabase]);
+
+  // Real-time subscription setup
+  const setupRealtimeSubscriptions = useCallback(() => {
+    if (!dbUserId) return;
+
+    console.log('🔄 Calendar: Setting up real-time subscriptions for user:', dbUserId);
+    
+    // Clear existing subscriptions
+    subscriptionsRef.current.forEach(subscription => {
+      subscription.unsubscribe();
+    });
+    subscriptionsRef.current = [];
+
+    // Calendar events subscription
+    const calendarSubscription = supabase
+      .channel(`calendar_events_${dbUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'calendar_events',
+          filter: `user_id=eq.${dbUserId}`
+        },
+        async (payload) => {
+          console.log('📅 Calendar: Real-time calendar event update:', payload);
+          
+          // Refresh calendar data when changes occur
+          const freshEvents = await fetchCalendarEvents();
+          setCalendarEvents(freshEvents);
+          setLastSync(new Date());
+          
+          // Show toast notification
+          if (payload.eventType === 'INSERT' && payload.new) {
+            showRealtimeToast.calendarAdded(payload.new.summary || 'New Event');
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📅 Calendar subscription status:', status);
+        setConnectionStatus(status);
+        
+        if (status === 'SUBSCRIBED') {
+          setIsConnected(true);
+          console.log('✅ Calendar: Real-time connected successfully');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setIsConnected(false);
+          console.log('❌ Calendar: Real-time disconnected, attempting reconnect...');
+          
+          // Attempt to reconnect after a delay
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+          }
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log('🔄 Calendar: Reconnecting...');
+            setupRealtimeSubscriptions();
+          }, 3000);
+        }
+      });
+
+    // Emails subscription
+    const emailSubscription = supabase
+      .channel(`emails_${dbUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'emails',
+          filter: `user_id=eq.${dbUserId}`
+        },
+        async (payload) => {
+          console.log('📧 Calendar: Real-time email update:', payload);
+          
+          // Refresh email data when changes occur
+          const freshEmails = await fetchEmails();
+          setEmails(freshEmails);
+          setLastSync(new Date());
+          
+          // Show toast notification
+          if (payload.eventType === 'INSERT' && payload.new) {
+            showRealtimeToast.emailAdded(payload.new.subject || 'New Email');
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📧 Email subscription status:', status);
+      });
+
+    // Store subscriptions for cleanup
+    subscriptionsRef.current = [calendarSubscription, emailSubscription];
+    
+  }, [dbUserId, supabase, fetchCalendarEvents, fetchEmails]);
+
+  // Manual refresh function
+  const refreshData = useCallback(async () => {
+    if (!dbUserId) return;
+    
+    console.log('🔄 Calendar: Manual refresh triggered');
+    setLoading(true);
+    
+    try {
+      const [eventsData, emailsData] = await Promise.all([
+        fetchCalendarEvents(),
+        fetchEmails()
+      ]);
+      
+      setCalendarEvents(eventsData);
+      setEmails(emailsData);
+      setLastSync(new Date());
+      
+      console.log('✅ Calendar: Manual refresh completed');
+    } catch (error) {
+      console.error('❌ Calendar: Manual refresh failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [dbUserId, fetchCalendarEvents, fetchEmails]);
 
   // Transform calendar events to meeting info format
   const transformCalendarEvent = (event: CalendarEvent): {
@@ -310,6 +454,13 @@ const Calendarprod = React.forwardRef<
     
     const days: DayType[] = [];
     
+    console.log('📅 Calendar: Generating calendar for:', {
+      month: format(currentDate, 'MMM yyyy'),
+      daysInMonth,
+      calendarEventsCount: calendarEvents.length,
+      emailsCount: emails.length
+    });
+    
     // Add previous month days to fill the grid
     for (let i = firstDayWeekday - 1; i >= 0; i--) {
       const prevDate = subDays(firstDayOfMonth, i + 1);
@@ -335,6 +486,16 @@ const Calendarprod = React.forwardRef<
         return getDate(emailDate) === day;
       });
       
+      // Log days with events for debugging
+      if (dayEvents.length > 0 || dayEmails.length > 0) {
+        console.log(`📅 Calendar: Day ${day} has:`, {
+          events: dayEvents.length,
+          emails: dayEmails.length,
+          eventTitles: dayEvents.map(e => e.summary),
+          emailSubjects: dayEmails.map(e => e.subject)
+        });
+      }
+      
       // Transform to meeting info and sort by timestamp (most recent first)
       const meetingInfo = [
         ...dayEvents.map(transformCalendarEvent),
@@ -359,6 +520,13 @@ const Calendarprod = React.forwardRef<
       });
     }
     
+    const daysWithEvents = days.filter(d => d.meetingInfo);
+    console.log('📅 Calendar: Generated calendar with:', {
+      totalDays: days.length,
+      daysWithEvents: daysWithEvents.length,
+      daysWithEventsNumbers: daysWithEvents.map(d => d.day)
+    });
+    
     return days;
   };
 
@@ -379,32 +547,84 @@ const Calendarprod = React.forwardRef<
     fetchDbUserId();
   }, [user]);
 
-  // Fetch data when database user ID is available
+  // Fetch initial data and setup real-time subscriptions when database user ID is available
   useEffect(() => {
-    const fetchData = async () => {
+    const initializeData = async () => {
       if (!dbUserId) {
-        console.log('⚠️ Calendarprod: No database user ID, skipping data fetch');
+        console.log('⚠️ Calendar: No database user ID, skipping initialization');
         return;
       }
       
-      console.log('📊 Calendarprod: Fetching calendar and email data for user:', dbUserId);
+      console.log('📊 Calendar: Initializing data and real-time subscriptions for user:', dbUserId);
       setLoading(true);
       
-      const [eventsData, emailsData] = await Promise.all([
-        fetchCalendarEvents(),
-        fetchEmails()
-      ]);
-      
-      console.log('📅 Calendarprod: Calendar events fetched:', eventsData.length);
-      console.log('📧 Calendarprod: Emails fetched:', emailsData.length);
-      
-      setCalendarEvents(eventsData);
-      setEmails(emailsData);
-      setLoading(false);
+      try {
+        // First, fetch initial data
+        console.log('📊 Calendar: Starting data fetch...');
+        const [eventsData, emailsData] = await Promise.all([
+          fetchCalendarEvents(),
+          fetchEmails()
+        ]);
+        
+        console.log('📅 Calendar: Initial calendar events fetched:', {
+          count: eventsData.length,
+          sampleEvents: eventsData.slice(0, 3).map(e => ({ summary: e.summary, start_time: e.start_time }))
+        });
+        console.log('📧 Calendar: Initial emails fetched:', {
+          count: emailsData.length,
+          sampleEmails: emailsData.slice(0, 3).map(e => ({ subject: e.subject, received_at: e.received_at }))
+        });
+        
+        setCalendarEvents(eventsData);
+        setEmails(emailsData);
+        setLastSync(new Date());
+        setLoading(false);
+        
+        console.log('✅ Calendar: Data loaded successfully, setting up real-time...');
+        
+        // Then setup real-time subscriptions
+        // Small delay to ensure data is rendered before subscriptions start
+        setTimeout(() => {
+          setupRealtimeSubscriptions();
+        }, 500);
+        
+      } catch (error) {
+        console.error('❌ Calendar: Failed to initialize data:', error);
+        setLoading(false);
+      }
     };
 
-    fetchData();
-  }, [dbUserId, currentDate, fetchCalendarEvents, fetchEmails]);
+    initializeData();
+    
+    // Cleanup function
+    return () => {
+      console.log('🧹 Calendar: Cleaning up subscriptions');
+      
+      // Clear any pending reconnection timeouts
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
+      // Unsubscribe from all real-time subscriptions
+      subscriptionsRef.current.forEach(subscription => {
+        subscription.unsubscribe();
+      });
+      subscriptionsRef.current = [];
+      
+      setIsConnected(false);
+      setConnectionStatus('CLOSED');
+    };
+  }, [dbUserId, currentDate, fetchCalendarEvents, fetchEmails, setupRealtimeSubscriptions]);
+
+  // Handle connection status changes for user feedback
+  useEffect(() => {
+    if (connectionStatus === 'SUBSCRIBED') {
+      showRealtimeToast.connectionStatus(true);
+    } else if (connectionStatus === 'CLOSED' || connectionStatus === 'CHANNEL_ERROR') {
+      showRealtimeToast.connectionStatus(false);
+    }
+  }, [connectionStatus]);
 
   // Generate days with real data
   const DAYS = generateCalendarDays();
@@ -507,9 +727,35 @@ const Calendarprod = React.forwardRef<
             className="flex w-full flex-col gap-4"
           >
             <div className="flex w-full items-center justify-between">
-              <motion.h2 className="mb-2 text-4xl font-bold tracking-wider text-zinc-300">
-                {format(currentDate, 'MMM')} <span className="opacity-50">{format(currentDate, 'yyyy')}</span>
-              </motion.h2>
+              <div>
+                <motion.h2 className="mb-1 text-4xl font-bold tracking-wider text-zinc-300">
+                  {format(currentDate, 'MMM')} <span className="opacity-50">{format(currentDate, 'yyyy')}</span>
+                </motion.h2>
+                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                  {isConnected ? (
+                    <>
+                      <Wifi className="h-3 w-3 text-green-500" />
+                      <span className="text-green-500">Live updates active</span>
+                      <span>•</span>
+                      <span>Last sync: {format(lastSync, 'HH:mm:ss')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="h-3 w-3 text-red-500" />
+                      <span className="text-red-500">Reconnecting...</span>
+                      <motion.button
+                        className="ml-2 flex items-center gap-1 text-zinc-400 hover:text-white"
+                        onClick={refreshData}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        <span>Refresh</span>
+                      </motion.button>
+                    </>
+                  )}
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <motion.button
                   className={`relative flex items-center gap-2 rounded-lg border border-[#323232] px-3 py-1.5 text-sm transition-colors ${

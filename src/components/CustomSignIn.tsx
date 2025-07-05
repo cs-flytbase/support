@@ -16,43 +16,10 @@ export default function CustomSignIn() {
 
     const syncUserToSupabase = async () => {
       try {
-        // Check if user already exists in the database
-        const { data, error } = await supabase
-          .from('users')
-          .select('id')
-          .eq('clerk_id', user.id)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error checking user:', error);
-          return;
-        }
-
-        // If user doesn't exist, create a new record
-        if (!data) {
-          const primaryEmail = user.primaryEmailAddress?.emailAddress;
-          
-          if (!primaryEmail) {
-            console.error('User has no primary email');
-            return;
-          }
-
-          const { error: insertError } = await supabase
-            .from('users')
-            .insert({
-              id: user.id,
-              email: primaryEmail,
-              full_name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-              avatar_url: user.imageUrl,
-              clerk_id: user.id
-            });
-
-          if (insertError) {
-            console.error('Error creating user in Supabase:', insertError);
-          } else {
-            console.log('User successfully created in Supabase');
-          }
-        }
+        // Use the centralized user creation function
+        const { ensureSupabaseUser } = await import('@/utils/auth');
+        await ensureSupabaseUser(user);
+        console.log('User successfully verified in Supabase');
 
         // Redirect to the main app page after sign-in and sync
         router.push('/');

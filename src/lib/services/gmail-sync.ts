@@ -4,6 +4,37 @@ import { syncHelpers } from './sync-helpers'
 import { embeddingService } from './embedding-service'
 import { gmail_v1 } from 'googleapis'
 
+// Helper function to clean Unicode surrogates that cause PostgreSQL errors
+function sanitizeUnicode(text: string): string {
+  if (!text || typeof text !== 'string') return text
+  
+  // Remove unpaired Unicode surrogates that cause PostgreSQL JSON errors
+  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
+}
+
+// Deep clean an object of Unicode issues
+function sanitizeObject(obj: any): any {
+  if (obj === null || obj === undefined) return obj
+  
+  if (typeof obj === 'string') {
+    return sanitizeUnicode(obj)
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeObject)
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: any = {}
+    for (const [key, value] of Object.entries(obj)) {
+      cleaned[sanitizeUnicode(key)] = sanitizeObject(value)
+    }
+    return cleaned
+  }
+  
+  return obj
+}
+
 export class GmailSyncService {
   private userId: string
   private dbUserId: string
@@ -222,7 +253,7 @@ export class GmailSyncService {
     if (!message.id) return null
     
     const headers = message.payload?.headers || []
-    const getHeader = (name: string) => headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || ''
+    const getHeader = (name: string) => sanitizeUnicode(headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '')
     
     const subject = getHeader('Subject')
     const fromHeader = getHeader('From')
@@ -232,20 +263,21 @@ export class GmailSyncService {
     const dateHeader = getHeader('Date')
     
     // Parse sender
-    const senderMatch = fromHeader.match(/^(.*?)\s*<(.+)>$/) || [null, fromHeader, fromHeader]
-    const senderName = senderMatch[1]?.replace(/"/g, '').trim() || ''
-    const senderEmail = senderMatch[2] || fromHeader
+    const senderMatch = sanitizeUnicode(fromHeader).match(/^(.*?)\s*<(.+)>$/) || [null, sanitizeUnicode(fromHeader), sanitizeUnicode(fromHeader)]
+    const senderName = sanitizeUnicode(senderMatch[1]?.replace(/"/g, '').trim() || '')
+    const senderEmail = sanitizeUnicode(senderMatch[2] || fromHeader)
     
     // Parse all recipients
-    const allRecipients = [toHeader, ccHeader, bccHeader]
+    const allRecipients = [sanitizeUnicode(toHeader), sanitizeUnicode(ccHeader), sanitizeUnicode(bccHeader)]
       .filter(Boolean)
       .join(',')
       .split(',')
       .map(email => {
-        const match = email.trim().match(/^(.*?)\s*<(.+)>$/) || [null, '', email.trim()]
+        const cleanEmail = sanitizeUnicode(email.trim())
+        const match = cleanEmail.match(/^(.*?)\s*<(.+)>$/) || [null, '', cleanEmail]
         return {
-          email: (match[2] || email.trim()).toLowerCase(),
-          name: match[1]?.replace(/"/g, '').trim() || ''
+          email: sanitizeUnicode((match[2] || cleanEmail).toLowerCase()),
+          name: sanitizeUnicode(match[1]?.replace(/"/g, '').trim() || '')
         }
       })
       .filter(r => r.email && r.email.includes('@'))
@@ -256,9 +288,9 @@ export class GmailSyncService {
     
     const extractContent = (part: any) => {
       if (part.mimeType === 'text/plain' && part.body?.data) {
-        textContent = Buffer.from(part.body.data, 'base64').toString('utf-8')
+        textContent = sanitizeUnicode(Buffer.from(part.body.data, 'base64').toString('utf-8'))
       } else if (part.mimeType === 'text/html' && part.body?.data) {
-        htmlContent = Buffer.from(part.body.data, 'base64').toString('utf-8')
+        htmlContent = sanitizeUnicode(Buffer.from(part.body.data, 'base64').toString('utf-8'))
       } else if (part.parts) {
         part.parts.forEach(extractContent)
       }
@@ -271,7 +303,7 @@ export class GmailSyncService {
     }
     
     const content = textContent || htmlContent.replace(/<[^>]*>/g, '')
-    const snippet = message.snippet || content.substring(0, 200)
+    const snippet = sanitizeUnicode(message.snippet || '') || content.substring(0, 200)
     
     // Try to link to customer by checking all emails involved
     const allEmails = [senderEmail, ...allRecipients.map(r => r.email)]
@@ -301,15 +333,15 @@ export class GmailSyncService {
       message_id: message.id, // Use message_id as per table schema
       google_message_id: message.id, // Also store as google_message_id for sync tracking
       thread_id: message.threadId,
-      sender_email: senderEmail.toLowerCase(),
-      sender_name: senderName,
-      recipient_emails: allRecipients.map(r => r.email), // Store as array, not JSON string
-      cc_emails: ccHeader ? ccHeader.split(',').map(e => e.trim()) : [],
-      bcc_emails: bccHeader ? bccHeader.split(',').map(e => e.trim()) : [],
-      subject: subject,
-      content: content,
-      html_content: htmlContent,
-      snippet: snippet,
+      sender_email: sanitizeUnicode(senderEmail.toLowerCase()),
+      sender_name: sanitizeUnicode(senderName),
+      recipient_emails: allRecipients.map(r => sanitizeUnicode(r.email)), // Store as array, not JSON string
+      cc_emails: ccHeader ? ccHeader.split(',').map(e => sanitizeUnicode(e.trim())) : [],
+      bcc_emails: bccHeader ? bccHeader.split(',').map(e => sanitizeUnicode(e.trim())) : [],
+      subject: sanitizeUnicode(subject),
+      content: sanitizeUnicode(content),
+      html_content: sanitizeUnicode(htmlContent),
+      snippet: sanitizeUnicode(snippet),
       is_read: !labelIds.includes('UNREAD'),
       is_important: labelIds.includes('IMPORTANT'),
       is_draft: emailType === 'draft',
@@ -320,10 +352,10 @@ export class GmailSyncService {
       date_sent: emailType === 'sent' ? receivedAt.toISOString() : null, // Use date_sent as per table schema
       sent_at: emailType === 'sent' ? receivedAt.toISOString() : null, // Also store as sent_at
       email_type: emailType,
-      raw_email_data: message, // Store as JSONB, not JSON string
-      raw_payload: message.payload || {}, // Store raw payload separately
-      raw_headers: headers.reduce((acc: any, h) => { acc[h.name || ''] = h.value; return acc; }, {}),
-      embedding_text: embeddingText,
+      raw_email_data: sanitizeObject(message), // Clean Unicode before storing as JSONB
+      raw_payload: sanitizeObject(message.payload || {}), // Clean Unicode before storing
+      raw_headers: sanitizeObject(headers.reduce((acc: any, h) => { acc[h.name || ''] = h.value; return acc; }, {})),
+      embedding_text: sanitizeUnicode(embeddingText),
       has_attachments: (message.payload?.parts || []).some(part => part.filename && part.filename.length > 0),
       attachment_count: (message.payload?.parts || []).filter(part => part.filename && part.filename.length > 0).length,
       gmail_history_id: message.historyId ? parseInt(message.historyId) : null,

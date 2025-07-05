@@ -172,47 +172,15 @@ const SettingsPage = () => {
     const syncUserWithSupabase = async () => {
       if (isLoaded && isSignedIn && clerkUser) {
         try {
-          // Check if user exists
-          const { data: existingUser, error: queryError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('clerk_id', clerkUser.id)
-            .single();
-
-          if (queryError && queryError.code !== 'PGRST116') { // PGRST116 is not found error
-            throw queryError;
-          }
-
-          // If user doesn't exist, create them
-          if (!existingUser) {
-            const { data: newUser, error: insertError } = await supabase
-              .from('users')
-              .insert({
-                email: clerkUser.primaryEmailAddress?.emailAddress || '',
-                full_name: `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim(),
-                avatar_url: clerkUser.imageUrl,
-                clerk_id: clerkUser.id
-              })
-              .select();
-
-            if (insertError) {
-              throw insertError;
-            }
-            
-            // Set the Supabase user ID from the newly created user
-            if (newUser && newUser.length > 0) {
-              setSupabaseUserId(newUser[0].id);
-              // Load existing API keys and AI agents after we have the user ID
-              loadApiKey(platformType);
-              loadAgents();
-            }
-          } else {
-            // Set the Supabase user ID from the existing user
-            setSupabaseUserId(existingUser.id);
-            // Load existing API keys and AI agents after we have the user ID
-            loadApiKey(platformType);
-            loadAgents();
-          }
+          // Use the centralized user creation function
+          const { ensureSupabaseUser } = await import('@/utils/auth');
+          const userId = await ensureSupabaseUser(clerkUser);
+          
+          // Set the Supabase user ID 
+          setSupabaseUserId(userId);
+          // Load existing API keys and AI agents after we have the user ID
+          loadApiKey(platformType);
+          loadAgents();
         } catch (error) {
           console.error('Error syncing user with Supabase:', error);
         }

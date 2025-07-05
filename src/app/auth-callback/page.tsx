@@ -32,42 +32,15 @@ export default function AuthCallbackPage() {
       try {
         const supabase = createClient();
         
-        // Force a direct insert without checking
-        const userData = {
-          // Important: Don't include an id field, let Supabase generate it
-          email: user.primaryEmailAddress?.emailAddress || 'no-email',
-          full_name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User',
-          avatar_url: user.imageUrl || '',
-          clerk_id: user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          is_active: true
-        };
+        // Use the centralized user creation function
+        setStatus('Creating/verifying user account...');
         
-        setStatus('Attempting to insert user...');
+        const { ensureSupabaseUser } = await import('@/utils/auth');
+        const userId = await ensureSupabaseUser(user);
         
-        // Try to insert - this will fail if the user already exists
-        const { data, error: insertError } = await supabase
-          .from('users')
-          .insert(userData)
-          .select();
-            
-        if (insertError) {
-          // Specific error handling
-          if (insertError.code === '23505') { // Unique violation
-            setStatus('User already exists in database');
-            setSuccess(true);
-            setTimeout(() => router.push('/'), 2000);
-            return;
-          }
-          
-          setStatus('Error inserting user');
-          setError(JSON.stringify(insertError));
-        } else {
-          setStatus('User successfully added to database!');
-          setSuccess(true);
-          setTimeout(() => router.push('/'), 2000);
-        }
+        setStatus('User successfully verified in database!');
+        setSuccess(true);
+        setTimeout(() => router.push('/'), 2000);
       } catch (error) {
         setStatus('Exception occurred');
         setError(JSON.stringify(error));

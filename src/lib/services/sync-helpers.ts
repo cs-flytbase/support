@@ -27,7 +27,7 @@ const createAdminClient = () => {
 }
 
 export const syncHelpers = {
-  // Get user by Clerk ID
+  // Get user by Clerk ID (now just a lookup - creation handled by auth.ts)
   async getUserByClerkId(clerkUserId: string) {
     const supabase = createAdminClient()
     const { data, error } = await supabase
@@ -36,7 +36,9 @@ export const syncHelpers = {
       .eq('clerk_id', clerkUserId)
       .single()
     
-    if (error) throw error
+    if (error) {
+      throw error
+    }
     return data
   },
 
