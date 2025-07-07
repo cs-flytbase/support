@@ -1,18 +1,9 @@
-import MinimalistDock from '@/components/ui/minimal-dock';
-import { TextShimmer } from '@/components/ui/text-shimmer';
-import InteractiveCalendar from '@/components/ui/visualize-booking';
+"use client";
 
+import React from 'react';
 
-export default function Page() {
-  return (
-    <div className='flex  items-center justify-center h-screen w-screen bg-black'>
-        {/* loading */}
-    {/* <TextShimmer className='font-mono text-sm' duration={1}>
-      booting up...
-    </TextShimmer>  */}
-  
-     {/* <MinimalistDock /> */}
-     <InteractiveCalendar />
-    </div>
-  )
+export default function EmailsPage() {
+  // The actual email list is now in the layout component
+  // This page component only renders when no email is selected
+  return <></>;
 }

@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: Promise<{ customer_id: string }> }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { customer_id } = await params;
 
     // Fetch deals for the specific customer by joining deals and deal_customers tables

@@ -72,17 +72,21 @@ const data = {
       ],
     },
     {
-      title: "Hubspot",
-      url: "#",
+      title: "HubSpot",
+      url: "/hubspot",
       icon: BookOpen,
       items: [
         {
-          title: "My Deals",
-          url: "#",
+          title: "Dashboard",
+          url: "/hubspot",
         },
         {
-          title: "Contacts",
-          url: "#",
+          title: "My Deals",
+          url: "/hubspot?tab=deals",
+        },
+        {
+          title: "Engagements",
+          url: "/hubspot?tab=engagements",
         }
       ],
     },

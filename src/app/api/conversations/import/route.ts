@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     console.log('Authentication successful for user:', userId);
 
     // Initialize Supabase client
-    const supabase = createClient();
+    const supabase = await createClient();
     
     // Parse the request body
     const body = await req.json();
