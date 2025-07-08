@@ -11,15 +11,9 @@ interface SyncResult {
   errors: string[]
 }
 
-type RouteContext = {
-  params: {
-    dealId: string
-  }
-}
-
 export async function POST(
   req: NextRequest,
-  { params }: RouteContext
+  { params }: { params: { dealId: string } }
 ) {
   try {
     const { userId } = await auth()
@@ -92,7 +86,7 @@ export async function POST(
 
 export async function GET(
   req: NextRequest,
-  { params }: RouteContext
+  { params }: { params: { dealId: string } }
 ) {
   try {
     const { userId } = await auth()
