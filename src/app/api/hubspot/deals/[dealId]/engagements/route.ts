@@ -11,9 +11,15 @@ interface SyncResult {
   errors: string[]
 }
 
+type RouteContext = {
+  params: {
+    dealId: string
+  }
+}
+
 export async function POST(
-  request: NextRequest,
-  context: { params: { dealId: string } }
+  req: NextRequest,
+  { params }: RouteContext
 ) {
   try {
     const { userId } = await auth()
@@ -21,7 +27,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const dealId = context.params.dealId
+    const dealId = params.dealId
     if (!dealId) {
       return NextResponse.json({ error: 'Deal ID is required' }, { status: 400 })
     }
@@ -85,8 +91,8 @@ export async function POST(
 }
 
 export async function GET(
-  request: NextRequest,
-  context: { params: { dealId: string } }
+  req: NextRequest,
+  { params }: RouteContext
 ) {
   try {
     const { userId } = await auth()
@@ -95,7 +101,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { dealId } = context.params
+    const { dealId } = params
 
     if (!dealId) {
       return NextResponse.json({ error: 'Deal ID is required' }, { status: 400 })
