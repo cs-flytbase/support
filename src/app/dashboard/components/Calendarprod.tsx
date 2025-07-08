@@ -7,6 +7,7 @@ import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, 
 import { useUser } from '@clerk/nextjs';
 import { TextShimmer } from '@/components/ui/text-shimmer';
 import { showRealtimeToast } from '@/components/ui/realtime-toast';
+import { toast } from 'sonner';
 
 export type DayType = {
   day: string;
@@ -266,6 +267,87 @@ const Calendarprod = React.forwardRef<
       return [];
     }
   }, [dbUserId, currentDate, supabase]);
+
+  // Subscribe to real-time updates
+  useEffect(() => {
+    if (!dbUserId) return;
+
+    console.log('🔄 Calendar: Setting up real-time subscriptions');
+
+    // Subscribe to calendar_events changes
+    const calendarChannel = supabase
+      .channel('calendar_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'calendar_events',
+          filter: `user_id=eq.${dbUserId}`
+        },
+        async (payload) => {
+          console.log('🔄 Calendar: Received calendar update:', payload);
+          
+          // Show notification
+          toast(
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-green-500" />
+              <div>
+                <p className="font-medium">Calendar Updated</p>
+                <p className="text-sm text-muted-foreground">
+                  A meeting has been {payload.eventType.toLowerCase()}d
+                </p>
+              </div>
+            </div>,
+            {
+              duration: 3000,
+              position: "bottom-right",
+            }
+          );
+
+          // Refresh data
+          const events = await fetchCalendarEvents();
+          setCalendarEvents(events);
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔄 Calendar: Subscription status:', status);
+        
+        if (status === 'SUBSCRIBED') {
+          setConnectionStatus('CONNECTED');
+          setIsConnected(true);
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setConnectionStatus('DISCONNECTED');
+          setIsConnected(false);
+          
+          // Attempt to reconnect after a delay
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+          }
+          reconnectTimeoutRef.current = setTimeout(() => {
+            calendarChannel.subscribe();
+          }, 5000);
+        }
+      });
+
+    // Store subscription for cleanup
+    subscriptionsRef.current.push(calendarChannel);
+
+    // Cleanup function
+    return () => {
+      console.log('🔄 Calendar: Cleaning up subscriptions');
+      subscriptionsRef.current.forEach(subscription => {
+        if (subscription?.unsubscribe) {
+          subscription.unsubscribe();
+        }
+      });
+      subscriptionsRef.current = [];
+      
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, [dbUserId, supabase, fetchCalendarEvents]);
 
   // Real-time subscription setup
   const setupRealtimeSubscriptions = useCallback(() => {
@@ -598,7 +680,7 @@ const Calendarprod = React.forwardRef<
     
     // Cleanup function
     return () => {
-      console.log('🧹 Calendar: Cleaning up subscriptions');
+      console.log('�� Calendar: Cleaning up subscriptions');
       
       // Clear any pending reconnection timeouts
       if (reconnectTimeoutRef.current) {
@@ -625,6 +707,120 @@ const Calendarprod = React.forwardRef<
       showRealtimeToast.connectionStatus(false);
     }
   }, [connectionStatus]);
+
+  // Connection status effect
+  useEffect(() => {
+    if (connectionStatus === 'CONNECTED') {
+      toast(
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+          <div>
+            <p className="font-medium text-green-700">Real-time Connected</p>
+            <p className="text-sm text-muted-foreground">
+              Database updates will appear instantly
+            </p>
+          </div>
+        </div>,
+        {
+          duration: 3000,
+          position: "bottom-right",
+        }
+      );
+    } else if (connectionStatus === 'DISCONNECTED') {
+      toast(
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-red-500"></div>
+          <div>
+            <p className="font-medium text-red-700">Real-time Disconnected</p>
+            <p className="text-sm text-muted-foreground">
+              Trying to reconnect...
+            </p>
+          </div>
+        </div>,
+        {
+          duration: 5000,
+          position: "bottom-right",
+        }
+      );
+    }
+  }, [connectionStatus]);
+
+  // Subscribe to meeting changes
+  useEffect(() => {
+    if (!dbUserId) return;
+
+    // Subscribe to both meetings and deal_engagements channels
+    const meetingsChannel = supabase
+      .channel('meetings_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'meetings'
+        },
+        async (payload) => {
+          console.log('🔄 Calendar: Received meetings update:', payload);
+          toast(
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-green-500" />
+              <div>
+                <p className="font-medium">Meeting Updated</p>
+                <p className="text-sm text-muted-foreground">
+                  A meeting has been {payload.eventType.toLowerCase()}d
+                </p>
+              </div>
+            </div>,
+            {
+              duration: 4000,
+              position: "bottom-right",
+            }
+          );
+          // Refresh data to get the latest changes
+          await refreshData();
+        }
+      )
+      .subscribe();
+
+    const engagementsChannel = supabase
+      .channel('engagements_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'deal_engagements',
+          filter: 'engagement_type=eq.MEETING'
+        },
+        async (payload) => {
+          console.log('🔄 Calendar: Received deal engagement update:', payload);
+          toast(
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-green-500" />
+              <div>
+                <p className="font-medium">Meeting Updated</p>
+                <p className="text-sm text-muted-foreground">
+                  A meeting engagement has been {payload.eventType.toLowerCase()}d
+                </p>
+              </div>
+            </div>,
+            {
+              duration: 4000,
+              position: "bottom-right",
+            }
+          );
+          // Refresh data to get the latest changes
+          await refreshData();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions
+    return () => {
+      meetingsChannel.unsubscribe();
+      engagementsChannel.unsubscribe();
+    };
+  }, [dbUserId, refreshData]);
 
   // Generate days with real data
   const DAYS = generateCalendarDays();
