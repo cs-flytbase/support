@@ -1,16 +1,12 @@
-import Calendarprod from "./components/Calendarprod";
-import RealtimeDashboard from "./components/RealtimeDashboard";
+'use client'
+
 import { SplineScene } from "@/components/ui/splite";
 import { Card } from "@/components/ui/card"
 import { Spotlight } from "@/components/ui/spotlight"
-import { BentoBox } from "@/components/dashboard/BentoBox";
-
-export default function DashboardPage() {
+ 
+export default function SplineSceneBasic() {
   return (
-    <div className="space-y-8 py-20">
-      <BentoBox />
-      {/* <RealtimeDashboard /> */}
-          <Card className="w-full h-[500px] bg-black/[0.96] relative overflow-hidden">
+    <Card className="w-full h-[500px] bg-black/[0.96] relative overflow-hidden">
       <Spotlight
         className="-top-40 left-0 md:left-60 md:-top-20"
         fill="white"
@@ -28,15 +24,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Right content */}
-        {/* <div className="flex-1 relative">
+        <div className="flex-1 relative">
           <SplineScene 
             scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
             className="w-full h-full"
           />
-        </div> */}
+        </div>
       </div>
     </Card>
-      <Calendarprod />
-    </div>
   )
 }
