@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Calendar, Wifi, WifiOff, RefreshCw } from 'lucide-react';
-import { createClient } from '@/utils/supabase/client';
+import { supabaseClient } from '@/utils/supabase/client';
 import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, subDays, getDaysInMonth, getDate } from 'date-fns';
 import { useUser } from '@clerk/nextjs';
 import { TextShimmer } from '@/components/ui/text-shimmer';
@@ -159,7 +159,7 @@ const Calendarprod = React.forwardRef<
   const subscriptionsRef = useRef<any[]>([]);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  const supabase = createClient();
+  const supabase = supabaseClient;
   const { user } = useUser();
 
   const handleDayHover = (day: string | null) => {
