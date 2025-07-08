@@ -182,30 +182,4 @@ export async function GET() {
       { status: 500 }
     )
   }
-}
-
-export async function POST() {
-  try {
-    const syncService = new HubSpotSyncService()
-    
-    // Start sync in background
-    syncService.syncContacts().catch(error => {
-      console.error('Background sync failed:', error)
-    })
-
-    return new NextResponse(JSON.stringify({ status: 'started' }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-  } catch (error) {
-    console.error('Failed to start sync:', error)
-    return new NextResponse(JSON.stringify({ error: 'Failed to start sync' }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-  }
 } 
