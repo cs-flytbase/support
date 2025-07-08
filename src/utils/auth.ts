@@ -1,11 +1,11 @@
-import { createClient } from '@/utils/supabase/client';
+import { supabaseClient } from '@/utils/supabase/client';
 
 /**
  * SINGLE SOURCE OF TRUTH for creating Supabase users from Clerk
  * This should be the ONLY place where users are created
  */
 export async function ensureSupabaseUser(clerkUser: any) {
-  const supabase = createClient();
+  const supabase = supabaseClient;
   
   try {
     // First check if user already exists
