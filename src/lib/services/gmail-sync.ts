@@ -3,6 +3,8 @@ import { GoogleAuthHelper } from './google-auth'
 import { syncHelpers } from './sync-helpers'
 import { embeddingService } from './embedding-service'
 import { gmail_v1 } from 'googleapis'
+import { google } from '@googleapis/gmail';
+import { supabaseClient } from '@/utils/supabase/client';
 
 // Helper function to clean Unicode surrogates that cause PostgreSQL errors
 function sanitizeUnicode(text: string): string {
@@ -33,6 +35,143 @@ function sanitizeObject(obj: any): any {
   }
   
   return obj
+}
+
+export async function sendEmail(userId: string, emailData: {
+  to: string;
+  subject: string;
+  body: string;
+  cc?: string[];
+  bcc?: string[];
+}) {
+  try {
+    // Get user's Google tokens
+    const { data: tokens, error: tokensError } = await supabaseClient
+      .from('user_google_tokens')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (tokensError || !tokens) {
+      throw new Error('Google tokens not found');
+    }
+
+    // Initialize Google API client
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI
+    );
+
+    oauth2Client.setCredentials({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+    });
+
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    // Construct email
+    const message = [
+      'Content-Type: text/html; charset=utf-8',
+      'MIME-Version: 1.0',
+      `To: ${emailData.to}`,
+      `Subject: ${emailData.subject}`,
+      emailData.cc?.length ? `Cc: ${emailData.cc.join(', ')}` : '',
+      emailData.bcc?.length ? `Bcc: ${emailData.bcc.join(', ')}` : '',
+      '',
+      emailData.body
+    ].join('\n');
+
+    // Encode the email
+    const encodedMessage = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    // Send email
+    const res = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: encodedMessage,
+      },
+    });
+
+    // Store email in Supabase
+    const { error: emailError } = await supabaseClient
+      .from('emails')
+      .insert({
+        message_id: res.data.id,
+        user_id: userId,
+        subject: emailData.subject,
+        sender_email: emailData.to,
+        received_at: new Date().toISOString(),
+      });
+
+    if (emailError) {
+      console.error('Error storing email:', emailError);
+      throw emailError;
+    }
+
+    return res.data;
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw error;
+  }
+}
+
+export async function markEmailAsRead(userId: string, messageId: string) {
+  try {
+    // Get user's Google tokens
+    const { data: tokens, error: tokensError } = await supabaseClient
+      .from('user_google_tokens')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (tokensError || !tokens) {
+      throw new Error('Google tokens not found');
+    }
+
+    // Initialize Google API client
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI
+    );
+
+    oauth2Client.setCredentials({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+    });
+
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    // Remove UNREAD label
+    await gmail.users.messages.modify({
+      userId: 'me',
+      id: messageId,
+      requestBody: {
+        removeLabelIds: ['UNREAD'],
+      },
+    });
+
+    // Update email in Supabase
+    const { error: emailError } = await supabaseClient
+      .from('emails')
+      .update({ is_read: true })
+      .match({ message_id: messageId, user_id: userId });
+
+    if (emailError) {
+      console.error('Error updating email:', emailError);
+      throw emailError;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error marking email as read:', error);
+    throw error;
+  }
 }
 
 export class GmailSyncService {
