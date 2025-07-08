@@ -11,6 +11,7 @@
   "dependencies": {
     "@clerk/nextjs": "^6.19.4",
     "@googleapis/calendar": "^10.0.1",
+    "@googleapis/gmail": "^13.0.1",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.14",
@@ -35,6 +36,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.0",
+    "google-auth-library": "^10.1.0",
     "googleapis": "^150.0.1",
     "lucide-react": "^0.511.0",
     "mongodb": "^6.17.0",

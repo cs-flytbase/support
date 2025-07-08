@@ -2,8 +2,7 @@
 import { GoogleAuthHelper } from './google-auth'
 import { syncHelpers } from './sync-helpers'
 import { embeddingService } from './embedding-service'
-import { calendar_v3 } from 'googleapis'
-import { google } from '@googleapis/calendar';
+import { calendar_v3, google } from 'googleapis'
 import { supabaseClient } from '@/utils/supabase/client';
 
 export async function createCalendarEvent(userId: string, eventData: {

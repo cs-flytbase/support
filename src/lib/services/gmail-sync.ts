@@ -2,8 +2,7 @@
 import { GoogleAuthHelper } from './google-auth'
 import { syncHelpers } from './sync-helpers'
 import { embeddingService } from './embedding-service'
-import { gmail_v1 } from 'googleapis'
-import { google } from '@googleapis/gmail';
+import { gmail_v1, google } from 'googleapis'
 import { supabaseClient } from '@/utils/supabase/client';
 
 // Helper function to clean Unicode surrogates that cause PostgreSQL errors
