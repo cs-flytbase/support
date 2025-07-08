@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { supabaseClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -42,7 +42,7 @@ export default function DashboardCallsPage() {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = supabaseClient;
 
   // Debounce search term
   useEffect(() => {

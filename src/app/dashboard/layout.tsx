@@ -3,7 +3,6 @@
 import MinimalistDock from "@/components/ui/minimal-dock";
 import React, { useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { createClient } from '@/utils/supabase/client';
 import Navigation from '@/components/Navigation';
 import { Toaster } from 'react-hot-toast';
 import { AppSidebar } from "@/components/app-sidebar"
