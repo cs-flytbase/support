@@ -1,9 +1,10 @@
 // lib/services/calendar-sync.ts
+import { calendar_v3 } from '@googleapis/calendar'
+import { OAuth2Client } from 'google-auth-library'
 import { GoogleAuthHelper } from './google-auth'
 import { syncHelpers } from './sync-helpers'
 import { embeddingService } from './embedding-service'
-import { calendar_v3, google } from 'googleapis'
-import { supabaseClient } from '@/utils/supabase/client';
+import { supabaseClient } from '@/utils/supabase/client'
 
 export async function createCalendarEvent(userId: string, eventData: {
   summary: string;
@@ -14,30 +15,7 @@ export async function createCalendarEvent(userId: string, eventData: {
   attendees?: string[];
 }) {
   try {
-    // Get user's Google tokens
-    const { data: tokens, error: tokensError } = await supabaseClient
-      .from('user_google_tokens')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (tokensError || !tokens) {
-      throw new Error('Google tokens not found');
-    }
-
-    // Initialize Google API client
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI
-    );
-
-    oauth2Client.setCredentials({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-    });
-
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+    const calendar = await GoogleAuthHelper.createCalendarClient(userId);
 
     // Create event in Google Calendar
     const event = await calendar.events.insert({
@@ -92,30 +70,7 @@ export async function updateCalendarEvent(userId: string, eventId: string, event
   attendees?: string[];
 }) {
   try {
-    // Get user's Google tokens
-    const { data: tokens, error: tokensError } = await supabaseClient
-      .from('user_google_tokens')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (tokensError || !tokens) {
-      throw new Error('Google tokens not found');
-    }
-
-    // Initialize Google API client
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI
-    );
-
-    oauth2Client.setCredentials({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-    });
-
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+    const calendar = await GoogleAuthHelper.createCalendarClient(userId);
 
     // Update event in Google Calendar
     const event = await calendar.events.patch({
@@ -163,12 +118,12 @@ export async function updateCalendarEvent(userId: string, eventId: string, event
 }
 
 export class CalendarSyncService {
-  private userId: string
-  private dbUserId: string
-  
+  private userId: string;
+  private dbUserId: string;
+
   constructor(userId: string, dbUserId: string) {
-    this.userId = userId
-    this.dbUserId = dbUserId
+    this.userId = userId;
+    this.dbUserId = dbUserId;
   }
 
   // Full sync - get ALL events from the past year
@@ -426,8 +381,8 @@ export class CalendarSyncService {
     return { eventsProcessed, newSyncToken }
   }
 
-  private async processBatch(
-    eventBatch: any[], 
+  async processBatch(
+    eventBatch: calendar_v3.Schema$Event[], 
     calendarId: string, 
     calendarName: string,
     isIncremental: boolean = false
@@ -624,6 +579,29 @@ export class CalendarSyncService {
       })
     } catch (error) {
       console.error('Error updating sync metadata:', error)
+    }
+  }
+
+  // Handle real-time calendar event updates
+  async handleEventUpdate(eventData: { id: string }): Promise<void> {
+    console.log(`Processing calendar event update for event ${eventData.id}`)
+    
+    try {
+      const calendar = await GoogleAuthHelper.createCalendarClient(this.userId)
+      
+      // Get full event details
+      const event = await calendar.events.get({
+        calendarId: 'primary',
+        eventId: eventData.id
+      })
+      
+      // Process and store event data
+      await this.processBatch([event.data], 'primary', 'Primary Calendar', true)
+      
+      console.log(`Successfully processed calendar event update for event ${eventData.id}`)
+    } catch (error) {
+      console.error('Failed to process calendar event update:', error)
+      throw error
     }
   }
 }

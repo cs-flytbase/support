@@ -908,7 +908,7 @@ export default function CustomerDetailPage() {
           goal_text: goalText,
           priority: priority,
           status: status,
-          assigned_agent_name: agentName || null
+          assigned_agent_name: agentName ?? null
         }])
         .select();
         
@@ -933,17 +933,17 @@ export default function CustomerDetailPage() {
         updated_at: new Date().toISOString()
       };
       
-      // Add optional fields if provided
+            // Add optional fields if provided
       if (priority !== undefined) {
         updateData.priority = priority;
       }
-      
+
       if (status !== undefined) {
         updateData.status = status;
       }
-      
+
       if (agentName !== undefined) {
-        updateData.assigned_agent_name = agentName || null;
+        updateData.assigned_agent_name = agentName ?? null;
       }
       
       const { error } = await supabase
@@ -1006,7 +1006,7 @@ export default function CustomerDetailPage() {
           is_editable: isEditable,
           priority: priority,
           status: status,
-          assigned_agent_name: agentName || null
+          assigned_agent_name: agentName ?? null
         }])
         .select();
         
@@ -1042,7 +1042,7 @@ export default function CustomerDetailPage() {
       
       // Add agent name if provided
       if (agentName !== undefined) {
-        updateData.assigned_agent_name = agentName || null;
+        updateData.assigned_agent_name = agentName ?? null;
       }
       
       const { error } = await supabase

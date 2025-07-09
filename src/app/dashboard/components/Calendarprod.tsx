@@ -268,6 +268,31 @@ const Calendarprod = React.forwardRef<
     }
   }, [dbUserId, currentDate, supabase]);
 
+  // Manual refresh function
+  const refreshData = useCallback(async () => {
+    if (!dbUserId) return;
+    
+    console.log('🔄 Calendar: Manual refresh triggered');
+    setLoading(true);
+    
+    try {
+      const [eventsData, emailsData] = await Promise.all([
+        fetchCalendarEvents(),
+        fetchEmails()
+      ]);
+      
+      setCalendarEvents(eventsData);
+      setEmails(emailsData);
+      setLastSync(new Date());
+      
+      console.log('✅ Calendar: Manual refresh completed');
+    } catch (error) {
+      console.error('❌ Calendar: Manual refresh failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [dbUserId, fetchCalendarEvents, fetchEmails]);
+
   // Subscribe to real-time updates
   useEffect(() => {
     if (!dbUserId) return;
@@ -276,7 +301,7 @@ const Calendarprod = React.forwardRef<
 
     // Subscribe to calendar_events changes
     const calendarChannel = supabase
-      .channel('calendar_changes')
+      .channel(`calendar_events_${dbUserId}`)
       .on(
         'postgres_changes',
         {
@@ -306,8 +331,7 @@ const Calendarprod = React.forwardRef<
           );
 
           // Refresh data
-          const events = await fetchCalendarEvents();
-          setCalendarEvents(events);
+          await refreshData();
         }
       )
       .subscribe((status) => {
@@ -330,8 +354,100 @@ const Calendarprod = React.forwardRef<
         }
       });
 
-    // Store subscription for cleanup
-    subscriptionsRef.current.push(calendarChannel);
+    // Subscribe to emails changes
+    const emailChannel = supabase
+      .channel(`emails_${dbUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'emails',
+          filter: `user_id=eq.${dbUserId}`
+        },
+        async (payload) => {
+          console.log('📧 Calendar: Real-time email update:', payload);
+          
+          // Refresh email data when changes occur
+          await refreshData();
+          
+          // Show toast notification
+          if (payload.eventType === 'INSERT' && payload.new) {
+            showRealtimeToast.emailAdded(payload.new.subject || 'New Email');
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to meetings changes
+    const meetingsChannel = supabase
+      .channel(`meetings_${dbUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'meetings'
+        },
+        async (payload) => {
+          console.log('🔄 Calendar: Received meetings update:', payload);
+          toast(
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-green-500" />
+              <div>
+                <p className="font-medium">Meeting Updated</p>
+                <p className="text-sm text-muted-foreground">
+                  A meeting has been {payload.eventType.toLowerCase()}d
+                </p>
+              </div>
+            </div>,
+            {
+              duration: 4000,
+              position: "bottom-right",
+            }
+          );
+          // Refresh data to get the latest changes
+          await refreshData();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to deal engagements
+    const engagementsChannel = supabase
+      .channel(`engagements_${dbUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'deal_engagements',
+          filter: 'engagement_type=eq.MEETING'
+        },
+        async (payload) => {
+          console.log('🔄 Calendar: Received deal engagement update:', payload);
+          toast(
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-green-500" />
+              <div>
+                <p className="font-medium">Meeting Updated</p>
+                <p className="text-sm text-muted-foreground">
+                  A meeting engagement has been {payload.eventType.toLowerCase()}d
+                </p>
+              </div>
+            </div>,
+            {
+              duration: 4000,
+              position: "bottom-right",
+            }
+          );
+          // Refresh data to get the latest changes
+          await refreshData();
+        }
+      )
+      .subscribe();
+
+    // Store all channels for cleanup
+    subscriptionsRef.current = [calendarChannel, emailChannel, meetingsChannel, engagementsChannel];
 
     // Cleanup function
     return () => {
@@ -347,126 +463,7 @@ const Calendarprod = React.forwardRef<
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [dbUserId, supabase, fetchCalendarEvents]);
-
-  // Real-time subscription setup
-  const setupRealtimeSubscriptions = useCallback(() => {
-    if (!dbUserId) return;
-
-    console.log('🔄 Calendar: Setting up real-time subscriptions for user:', dbUserId);
-    
-    // Clear existing subscriptions
-    subscriptionsRef.current.forEach(subscription => {
-      subscription.unsubscribe();
-    });
-    subscriptionsRef.current = [];
-
-    // Calendar events subscription
-    const calendarSubscription = supabase
-      .channel(`calendar_events_${dbUserId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'calendar_events',
-          filter: `user_id=eq.${dbUserId}`
-        },
-        async (payload) => {
-          console.log('📅 Calendar: Real-time calendar event update:', payload);
-          
-          // Refresh calendar data when changes occur
-          const freshEvents = await fetchCalendarEvents();
-          setCalendarEvents(freshEvents);
-          setLastSync(new Date());
-          
-          // Show toast notification
-          if (payload.eventType === 'INSERT' && payload.new) {
-            showRealtimeToast.calendarAdded(payload.new.summary || 'New Event');
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('📅 Calendar subscription status:', status);
-        setConnectionStatus(status);
-        
-        if (status === 'SUBSCRIBED') {
-          setIsConnected(true);
-          console.log('✅ Calendar: Real-time connected successfully');
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setIsConnected(false);
-          console.log('❌ Calendar: Real-time disconnected, attempting reconnect...');
-          
-          // Attempt to reconnect after a delay
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-          }
-          
-          reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('🔄 Calendar: Reconnecting...');
-            setupRealtimeSubscriptions();
-          }, 3000);
-        }
-      });
-
-    // Emails subscription
-    const emailSubscription = supabase
-      .channel(`emails_${dbUserId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'emails',
-          filter: `user_id=eq.${dbUserId}`
-        },
-        async (payload) => {
-          console.log('📧 Calendar: Real-time email update:', payload);
-          
-          // Refresh email data when changes occur
-          const freshEmails = await fetchEmails();
-          setEmails(freshEmails);
-          setLastSync(new Date());
-          
-          // Show toast notification
-          if (payload.eventType === 'INSERT' && payload.new) {
-            showRealtimeToast.emailAdded(payload.new.subject || 'New Email');
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('📧 Email subscription status:', status);
-      });
-
-    // Store subscriptions for cleanup
-    subscriptionsRef.current = [calendarSubscription, emailSubscription];
-    
-  }, [dbUserId, supabase, fetchCalendarEvents, fetchEmails]);
-
-  // Manual refresh function
-  const refreshData = useCallback(async () => {
-    if (!dbUserId) return;
-    
-    console.log('🔄 Calendar: Manual refresh triggered');
-    setLoading(true);
-    
-    try {
-      const [eventsData, emailsData] = await Promise.all([
-        fetchCalendarEvents(),
-        fetchEmails()
-      ]);
-      
-      setCalendarEvents(eventsData);
-      setEmails(emailsData);
-      setLastSync(new Date());
-      
-      console.log('✅ Calendar: Manual refresh completed');
-    } catch (error) {
-      console.error('❌ Calendar: Manual refresh failed:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [dbUserId, fetchCalendarEvents, fetchEmails]);
+  }, [dbUserId, supabase, fetchCalendarEvents, fetchEmails, refreshData]);
 
   // Transform calendar events to meeting info format
   const transformCalendarEvent = (event: CalendarEvent): {
@@ -667,7 +664,7 @@ const Calendarprod = React.forwardRef<
         // Then setup real-time subscriptions
         // Small delay to ensure data is rendered before subscriptions start
         setTimeout(() => {
-          setupRealtimeSubscriptions();
+          // setupRealtimeSubscriptions(); // This function is now handled by the useEffect hook
         }, 500);
         
       } catch (error) {
@@ -697,7 +694,7 @@ const Calendarprod = React.forwardRef<
       setIsConnected(false);
       setConnectionStatus('CLOSED');
     };
-  }, [dbUserId, currentDate, fetchCalendarEvents, fetchEmails, setupRealtimeSubscriptions]);
+  }, [dbUserId, currentDate, fetchCalendarEvents, fetchEmails]);
 
   // Handle connection status changes for user feedback
   useEffect(() => {
@@ -744,83 +741,6 @@ const Calendarprod = React.forwardRef<
       );
     }
   }, [connectionStatus]);
-
-  // Subscribe to meeting changes
-  useEffect(() => {
-    if (!dbUserId) return;
-
-    // Subscribe to both meetings and deal_engagements channels
-    const meetingsChannel = supabase
-      .channel('meetings_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'meetings'
-        },
-        async (payload) => {
-          console.log('🔄 Calendar: Received meetings update:', payload);
-          toast(
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-green-500" />
-              <div>
-                <p className="font-medium">Meeting Updated</p>
-                <p className="text-sm text-muted-foreground">
-                  A meeting has been {payload.eventType.toLowerCase()}d
-                </p>
-              </div>
-            </div>,
-            {
-              duration: 4000,
-              position: "bottom-right",
-            }
-          );
-          // Refresh data to get the latest changes
-          await refreshData();
-        }
-      )
-      .subscribe();
-
-    const engagementsChannel = supabase
-      .channel('engagements_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'deal_engagements',
-          filter: 'engagement_type=eq.MEETING'
-        },
-        async (payload) => {
-          console.log('🔄 Calendar: Received deal engagement update:', payload);
-          toast(
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-green-500" />
-              <div>
-                <p className="font-medium">Meeting Updated</p>
-                <p className="text-sm text-muted-foreground">
-                  A meeting engagement has been {payload.eventType.toLowerCase()}d
-                </p>
-              </div>
-            </div>,
-            {
-              duration: 4000,
-              position: "bottom-right",
-            }
-          );
-          // Refresh data to get the latest changes
-          await refreshData();
-        }
-      )
-      .subscribe();
-
-    // Cleanup subscriptions
-    return () => {
-      meetingsChannel.unsubscribe();
-      engagementsChannel.unsubscribe();
-    };
-  }, [dbUserId, refreshData]);
 
   // Generate days with real data
   const DAYS = generateCalendarDays();

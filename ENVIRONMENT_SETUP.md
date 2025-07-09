@@ -45,6 +45,28 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 Replace `your_internal_api_token_here` with the generated token.
 
+### 4. Slack OAuth Configuration
+
+**Current Status:** ❌ Missing - Required for Slack integration
+
+**How to set it up:**
+1. Go to [Slack API Apps](https://api.slack.com/apps)
+2. Create a new app or select an existing one
+3. Under "OAuth & Permissions", add the following scopes:
+   - `channels:read`
+   - `channels:history`
+   - `chat:write`
+   - `users:read`
+   - `users:read.email`
+4. Install the app to your workspace
+5. Copy the OAuth tokens to your `.env` file:
+
+```bash
+SLACK_CLIENT_ID=your_slack_client_id_here
+SLACK_CLIENT_SECRET=your_slack_client_secret_here
+SLACK_SIGNING_SECRET=your_slack_signing_secret_here
+```
+
 ## Environment Variables Status
 
 | Variable | Status | Description |
@@ -57,6 +79,9 @@ Replace `your_internal_api_token_here` with the generated token.
 | `OPENAI_API_KEY` | ❌ **Missing** | Required for AI embeddings |
 | `CRON_SECRET` | ✅ Set | Cron job security |
 | `INTERNAL_API_TOKEN` | ❌ **Missing** | Required for webhook security |
+| `SLACK_CLIENT_ID` | ❌ **Missing** | Required for Slack OAuth |
+| `SLACK_CLIENT_SECRET` | ❌ **Missing** | Required for Slack OAuth |
+| `SLACK_SIGNING_SECRET` | ❌ **Missing** | Required for Slack OAuth |
 
 ## Quick Fix for Calendar Meetings Error
 

@@ -372,5 +372,20 @@ export const syncHelpers = {
       .or(`message_id.eq.${googleMessageId},google_message_id.eq.${googleMessageId}`)
     
     if (error) throw error
+  },
+
+  // Upsert email
+  async upsertEmail(emailData: any) {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from('emails')
+      .upsert(emailData, {
+        onConflict: 'google_message_id',
+        ignoreDuplicates: false
+      })
+      .select()
+    
+    if (error) throw error
+    return data
   }
 }

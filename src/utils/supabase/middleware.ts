@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Database } from './database.types';
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({
+  let response: NextResponse = NextResponse.next({
     request: {
       headers: request.headers,
     },
