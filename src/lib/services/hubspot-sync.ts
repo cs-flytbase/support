@@ -117,8 +117,8 @@ interface SyncProgress {
 type SupabaseClientType = SupabaseClient<Database>
 
 interface AssociationType {
-  from: keyof Database['public']['Tables']
-  to: keyof Database['public']['Tables']
+  from: string & keyof Database['public']['Tables']
+  to: string & keyof Database['public']['Tables']
 }
 
 type HubspotObject = {
@@ -127,7 +127,7 @@ type HubspotObject = {
 }
 
 // Fix dynamic property access
-const getHubspotIdField = (table: keyof Database['public']['Tables']): string => {
+const getHubspotIdField = (table: string & keyof Database['public']['Tables']): string => {
   switch (table) {
     case 'companies':
       return 'hubspot_company_id'
@@ -984,7 +984,7 @@ export class HubSpotSyncService {
         console.log(`\n🔗 [HubSpot] Processing ${assocType.from} to ${assocType.to} associations...`)
         
         // Get all objects of the 'from' type
-        const hubspotIdField = getHubspotIdField(assocType.from as keyof Database['public']['Tables'])
+        const hubspotIdField = getHubspotIdField(assocType.from)
         let allFromObjects: any[] = []
         let page = 0
         const pageSize = 1000
@@ -1051,7 +1051,7 @@ export class HubSpotSyncService {
                 const { data: toObject, error: toError } = await supabase
                   .from(assocType.to)
               .select('id')
-                  .eq(getHubspotIdField(assocType.to as keyof Database['public']['Tables']), hubspotToId)
+                  .eq(getHubspotIdField(assocType.to), hubspotToId)
               .single()
 
                 if (toError && toError.code !== 'PGRST116') { // Ignore not found error
