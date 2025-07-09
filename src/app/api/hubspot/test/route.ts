@@ -214,7 +214,7 @@ async function testRateLimiting(hubspotSync: HubSpotSyncService) {
     const promises = []
     for (let i = 0; i < 5; i++) {
       promises.push(
-        hubspotSync.testConnection().then(result => ({
+        hubspotSync.testConnection().then((result: { success: boolean; error?: string }) => ({
           request: i + 1,
           ...result,
           timestamp: Date.now()
