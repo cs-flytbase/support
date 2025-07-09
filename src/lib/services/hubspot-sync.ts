@@ -1,6 +1,6 @@
-import { createClient } from '@/utils/supabase/server'
+import { createClient } from '../../utils/supabase/server'
 import { auth } from '@clerk/nextjs/server'
-import { Database } from '@/utils/supabase/database.types'
+import { Database } from '../../utils/supabase/database.types'
 import { createServerClient } from '@supabase/ssr'
 import { SupabaseClient } from '@supabase/supabase-js'
 
@@ -136,7 +136,7 @@ const getHubspotIdField = (table: keyof Database['public']['Tables']): string =>
     case 'deals':
       return 'hubspot_deal_id'
     default:
-      throw new Error(`Unknown table: ${table}`)
+      throw new Error(`Unknown table: ${String(table)}`)
   }
 }
 
@@ -206,7 +206,7 @@ export class HubSpotSyncService {
     if (!this.supabase) {
       this.supabase = await createClient()
     }
-    return this.supabase
+    return this.supabase!
   }
 
   private async makeRequest<T>(endpoint: string, params: any = {}): Promise<T> {
@@ -981,7 +981,7 @@ export class HubSpotSyncService {
       
       // Process each association type
       for (const assocType of associationTypes) {
-        console.log(`\n🔗 [HubSpot] Processing ${assocType.from} to ${assocType.to} associations...`)
+        console.log(`\n🔗 [HubSpot] Processing ${String(assocType.from)} to ${String(assocType.to)} associations...`)
         
         // Get all objects of the 'from' type
         const hubspotIdField = getHubspotIdField(assocType.from as keyof Database['public']['Tables'])
@@ -991,13 +991,13 @@ export class HubSpotSyncService {
 
         while (true) {
           const { data: fromObjects, error: fromError } = await supabase
-            .from(assocType.from)
+            .from(String(assocType.from))
             .select(`id, ${hubspotIdField}`)
             .not(hubspotIdField, 'is', null)
             .range(page * pageSize, (page + 1) * pageSize - 1)
 
           if (fromError) {
-            this.log('error', `Failed to fetch ${assocType.from}`, { error: fromError })
+            this.log('error', `Failed to fetch ${String(assocType.from)}`, { error: fromError })
             break
           }
 
@@ -1010,11 +1010,11 @@ export class HubSpotSyncService {
         }
 
         if (!allFromObjects.length) {
-          this.log('info', `No ${assocType.from} found to process`)
+          this.log('info', `No ${String(assocType.from)} found to process`)
           continue
         }
 
-        console.log(`📊 [HubSpot] Found ${allFromObjects.length} ${assocType.from} to process`)
+        console.log(`📊 [HubSpot] Found ${allFromObjects.length} ${String(assocType.from)} to process`)
         
         // Process in batches
         for (let i = 0; i < allFromObjects.length; i += batchSize) {
@@ -1036,20 +1036,20 @@ export class HubSpotSyncService {
               // Fetch associations from HubSpot
           const associations = await this.makeRequest<{
                 results: Array<{ toObjectId: string; associationTypes: Array<{ typeId: number; label: string; category: string }> }>
-              }>(`/crm/v4/objects/${assocType.from}/${hubspotFromId}/associations/${assocType.to}`)
+              }>(`/crm/v4/objects/${String(assocType.from)}/${hubspotFromId}/associations/${String(assocType.to)}`)
 
               if (!associations.results?.length) continue
 
-              this.log('info', `Found ${associations.results.length} associations for ${assocType.from} ${hubspotFromId}`)
+              this.log('info', `Found ${associations.results.length} associations for ${String(assocType.from)} ${hubspotFromId}`)
 
               for (const association of associations.results) {
                 const hubspotToId = association.toObjectId
-                const toObjectType = assocType.to === 'companies' ? 'company' : assocType.to.slice(0, -1) // Special case for companies
-                const fromObjectType = assocType.from === 'companies' ? 'company' : assocType.from.slice(0, -1) // Special case for companies
+                const toObjectType = String(assocType.to) === 'companies' ? 'company' : String(assocType.to).slice(0, -1) // Special case for companies
+                const fromObjectType = String(assocType.from) === 'companies' ? 'company' : String(assocType.from).slice(0, -1) // Special case for companies
                 
                 // Find the target object in our database
                 const { data: toObject, error: toError } = await supabase
-                  .from(assocType.to)
+                  .from(String(assocType.to))
               .select('id')
                   .eq(getHubspotIdField(assocType.to as keyof Database['public']['Tables']), hubspotToId)
               .single()
@@ -1076,7 +1076,7 @@ export class HubSpotSyncService {
             }
           }
         } catch (error) {
-              const errorMsg = `Failed to process associations for ${assocType.from} ${hubspotFromId}: ${error instanceof Error ? error.message : String(error)}`
+              const errorMsg = `Failed to process associations for ${String(assocType.from)} ${hubspotFromId}: ${error instanceof Error ? error.message : String(error)}`
               this.log('error', errorMsg, { error })
           errors.push(errorMsg)
         }
