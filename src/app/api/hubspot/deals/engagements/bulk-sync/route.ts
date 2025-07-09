@@ -23,8 +23,7 @@ export async function POST() {
       return NextResponse.json({
         success: true,
         stats: {
-          totalDeals: result.totalDeals,
-          totalEngagements: result.totalEngagements,
+          syncedEngagements: result.synced,
           startTime,
           endTime,
           duration: `${duration.toFixed(2)}s`,

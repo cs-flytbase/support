@@ -1167,7 +1167,7 @@ export class HubSpotSyncService {
     }
   }
 
-  private async getAssociationCounts(): Promise<AssociationCounts> {
+  async getAssociationCounts(): Promise<AssociationCounts> {
     const supabase = await this.getSupabase()
     const { data, error } = await supabase
       .from('hubspot_associations')
@@ -1513,6 +1513,67 @@ export class HubSpotSyncService {
     } catch (error) {
       this.log('error', '❌ Error fetching paginated companies:', error)
       throw error
+    }
+  }
+
+  async checkDuplicateAssociations(): Promise<DuplicateAssociation[]> {
+    const supabase = await this.getSupabase()
+    const { data, error } = await supabase
+      .from('hubspot_associations')
+      .select('from_object_id, to_object_id, from_object_type, to_object_type')
+
+    if (error) {
+      throw new Error(`Failed to check duplicate associations: ${error.message}`)
+    }
+
+    // Group by association key and count
+    const associationCounts: Record<string, DuplicateAssociation> = {}
+    
+    data?.forEach(assoc => {
+      const key = `${assoc.from_object_id}_${assoc.to_object_id}_${assoc.from_object_type}_${assoc.to_object_type}`
+      
+      if (associationCounts[key]) {
+        associationCounts[key].count++
+      } else {
+        associationCounts[key] = {
+          from_object_id: assoc.from_object_id,
+          to_object_id: assoc.to_object_id,
+          from_object_type: assoc.from_object_type,
+          to_object_type: assoc.to_object_type,
+          count: 1
+        }
+      }
+    })
+
+    // Return only duplicates (count > 1)
+    return Object.values(associationCounts).filter(assoc => assoc.count > 1)
+  }
+
+  async syncAllUserDealEngagements(userId: string): Promise<{ synced: number; errors: string[] }> {
+    this.log('info', `🔄 Starting bulk sync of all deal engagements for user ${userId}`)
+    
+    // Get all user deals
+    const userDeals = await this.getUserDeals(userId)
+    let totalSynced = 0
+    const errors: string[] = []
+
+    for (const deal of userDeals) {
+      try {
+        const synced = await this.syncDealEngagements(deal.id, userId)
+        totalSynced += synced
+        this.log('info', `✅ Synced ${synced} engagements for deal ${deal.id}`)
+      } catch (error) {
+        const errorMsg = `Failed to sync engagements for deal ${deal.id}: ${error instanceof Error ? error.message : String(error)}`
+        this.log('error', errorMsg)
+        errors.push(errorMsg)
+      }
+    }
+
+    this.log('info', `🎉 Bulk sync complete: ${totalSynced} total engagements synced for ${userDeals.length} deals`)
+    
+    return {
+      synced: totalSynced,
+      errors
     }
   }
 } 
