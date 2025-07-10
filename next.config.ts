@@ -2,16 +2,23 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   webpack: (config, { isServer }) => {
-    // Handle node: protocol imports
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      'node:fs': 'fs',
-      'node:os': 'os',
-      'node:path': 'path',
-      'node:querystring': 'querystring',
-      'node:stream': 'stream'
-    };
-
+    if (!isServer) {
+      // Client-side configuration
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        os: false,
+        path: false,
+        querystring: false,
+        stream: false,
+        crypto: false,
+        http: false,
+        https: false,
+        net: false,
+        tls: false,
+        zlib: false
+      };
+    }
     return config;
   }
 };
