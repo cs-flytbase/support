@@ -299,9 +299,17 @@ const Calendarprod = React.forwardRef<
 
     console.log('🔄 Calendar: Setting up real-time subscriptions');
 
+    // Cleanup any existing subscriptions first
+    subscriptionsRef.current.forEach(subscription => {
+      if (subscription?.unsubscribe) {
+        subscription.unsubscribe();
+      }
+    });
+    subscriptionsRef.current = [];
+
     // Subscribe to calendar_events changes
     const calendarChannel = supabase
-      .channel(`calendar_events_${dbUserId}`)
+      .channel(`calendar_events_${dbUserId}_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -356,7 +364,7 @@ const Calendarprod = React.forwardRef<
 
     // Subscribe to emails changes
     const emailChannel = supabase
-      .channel(`emails_${dbUserId}`)
+      .channel(`emails_${dbUserId}_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -381,7 +389,7 @@ const Calendarprod = React.forwardRef<
 
     // Subscribe to meetings changes
     const meetingsChannel = supabase
-      .channel(`meetings_${dbUserId}`)
+      .channel(`meetings_${dbUserId}_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -414,7 +422,7 @@ const Calendarprod = React.forwardRef<
 
     // Subscribe to deal engagements
     const engagementsChannel = supabase
-      .channel(`engagements_${dbUserId}`)
+      .channel(`engagements_${dbUserId}_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

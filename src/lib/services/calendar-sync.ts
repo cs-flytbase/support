@@ -133,6 +133,7 @@ export class CalendarSyncService {
     try {
       const calendar = await GoogleAuthHelper.createCalendarClient(this.userId)
       const now = new Date()
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const timeMin = new Date()
       timeMin.setDate(now.getDate() - daysBack)
       
@@ -148,29 +149,49 @@ export class CalendarSyncService {
       
       let totalEventsProcessed = 0
       
-      // Sync each calendar
+      // First sync recent and future events
+      console.log('First syncing recent and future events...')
       for (const cal of calendars) {
         if (!cal.id) continue
         
-        console.log(`Syncing calendar: ${cal.summary || cal.id}`)
+        console.log(`Syncing recent events for calendar: ${cal.summary || cal.id}`)
+        try {
+          const eventsProcessed = await this.syncCalendarEvents(
+            calendar, 
+            cal.id, 
+            cal.summary || 'Unknown Calendar',
+            startOfToday,
+            null,
+            true,
+            undefined // No end time for future events
+          )
+          totalEventsProcessed += eventsProcessed
+          await new Promise(resolve => setTimeout(resolve, 100))
+        } catch (error) {
+          console.error(`Error syncing recent events for calendar ${cal.id}:`, error)
+        }
+      }
+      
+      // Then sync older events
+      console.log('Now syncing older events...')
+      for (const cal of calendars) {
+        if (!cal.id) continue
         
+        console.log(`Syncing older events for calendar: ${cal.summary || cal.id}`)
         try {
           const eventsProcessed = await this.syncCalendarEvents(
             calendar, 
             cal.id, 
             cal.summary || 'Unknown Calendar',
             timeMin,
-            null, // No sync token for full sync
-            true // isFullSync
+            null,
+            true,
+            startOfToday // End time for older events
           )
           totalEventsProcessed += eventsProcessed
-          
-          // Small delay between calendars
           await new Promise(resolve => setTimeout(resolve, 100))
-          
         } catch (error) {
-          console.error(`Error syncing calendar ${cal.id}:`, error)
-          // Continue with other calendars
+          console.error(`Error syncing older events for calendar ${cal.id}:`, error)
         }
       }
       
@@ -275,7 +296,8 @@ export class CalendarSyncService {
     calendarName: string,
     timeMin: Date,
     syncToken: string | null,
-    isFullSync: boolean = false
+    isFullSync: boolean = false,
+    timeMax: Date | undefined = undefined
   ): Promise<number> {
     let allEvents: any[] = []
     let pageToken: string | undefined
@@ -294,7 +316,7 @@ export class CalendarSyncService {
       
       if (isFullSync) {
         requestParams.timeMin = timeMin.toISOString()
-        requestParams.timeMax = new Date().toISOString()
+        requestParams.timeMax = timeMax ? timeMax.toISOString() : new Date().toISOString()
       } else if (syncToken) {
         requestParams.syncToken = syncToken
       }
@@ -518,7 +540,7 @@ export class CalendarSyncService {
       end_time: endDate.toISOString(),
       is_all_day: isAllDay,
       event_type: eventType,
-      attendees: JSON.stringify(attendees),
+      attendees: attendees,
       organizer_email: event.organizer?.email?.toLowerCase() || '',
       organizer_name: event.organizer?.displayName || '',
       status: event.status || 'confirmed',

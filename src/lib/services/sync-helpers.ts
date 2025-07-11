@@ -380,7 +380,7 @@ export const syncHelpers = {
     const { data, error } = await supabase
       .from('emails')
       .upsert(emailData, {
-        onConflict: 'google_message_id',
+        onConflict: 'message_id',
         ignoreDuplicates: false
       })
       .select()

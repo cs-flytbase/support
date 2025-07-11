@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { supabaseClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -29,7 +29,6 @@ export default function KnowledgeBasePage() {
     link: ''
   });
   
-  const supabase = createClient();
   const router = useRouter();
 
   // Load knowledge bases
@@ -39,7 +38,7 @@ export default function KnowledgeBasePage() {
       setError(null);
       
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
           .from('knowledge_bases')
           .select('*')
           .order('created_at', { ascending: false });
@@ -55,7 +54,7 @@ export default function KnowledgeBasePage() {
     }
     
     loadKnowledgeBases();
-  }, [supabase]);
+  }, []);
 
   // Format date
   const formatDate = (dateString: string | null) => {
@@ -87,7 +86,7 @@ export default function KnowledgeBasePage() {
     }
     
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .from('knowledge_bases')
         .insert([
           {

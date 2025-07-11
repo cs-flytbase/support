@@ -20,45 +20,21 @@ export class GmailSyncService {
     
     try {
       const gmail = await GoogleAuthHelper.createGmailClient(this.userId)
+      
+      // First sync recent emails (today and future)
       const now = new Date()
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      console.log('First syncing recent emails...')
+      await this.syncEmailsForTimeRange(gmail, startOfToday, null)
+      
+      // Then sync older emails
       const timeMin = new Date()
       timeMin.setDate(now.getDate() - daysBack)
+      console.log('Now syncing older emails...')
+      await this.syncEmailsForTimeRange(gmail, timeMin, startOfToday)
       
-      let totalEmailsProcessed = 0
-      let pageToken: string | undefined
-      
-      do {
-        await GoogleAuthHelper.checkRateLimit(this.userId, 250)
-        
-        const query = `after:${Math.floor(timeMin.getTime() / 1000)}`
-        const response = await gmail.users.messages.list({
-          userId: 'me',
-          maxResults: 100,
-          pageToken,
-          q: query
-        })
-        
-        const messages = response.data.messages || []
-        if (messages.length === 0) break
-        
-        // Process messages in batches
-        const processed = await this.processBatch(gmail, messages)
-        totalEmailsProcessed += processed
-        
-        pageToken = response.data.nextPageToken || undefined
-        console.log(`Processed ${totalEmailsProcessed} emails so far`)
-        
-      } while (pageToken && totalEmailsProcessed < 10000) // Reasonable limit
-      
-      // Update sync metadata
-      await this.updateSyncMetadata('full', {
-        last_sync_type: 'full',
-        emails_synced: totalEmailsProcessed,
-        sync_completed_at: new Date().toISOString()
-      })
-      
-      console.log(`Full Gmail sync completed: ${totalEmailsProcessed} emails`)
-      return { success: true, emailsSynced: totalEmailsProcessed }
+      console.log(`Full Gmail sync completed`)
+      return { success: true }
       
     } catch (error) {
       console.error('Gmail full sync failed:', error)
@@ -325,17 +301,17 @@ export class GmailSyncService {
       user_id: this.dbUserId,
       customer_id: customerId,
       thread_id: message.threadId || null,
-      gmail_id: message.id,
+      message_id: message.id,
       subject: subject,
-      from_email: fromEmail,
-      from_name: this.extractName(from),
-      to_emails: JSON.stringify(toEmails),
-      cc_emails: JSON.stringify(this.extractEmails(headers.find(h => h.name?.toLowerCase() === 'cc')?.value || '')),
-      bcc_emails: JSON.stringify(this.extractEmails(headers.find(h => h.name?.toLowerCase() === 'bcc')?.value || '')),
-      date_received: date ? new Date(date).toISOString() : null,
-      text_content: textContent,
+      sender_email: fromEmail,
+      sender_name: this.extractName(from),
+      recipient_emails: toEmails,
+      cc_emails: this.extractEmails(headers.find(h => h.name?.toLowerCase() === 'cc')?.value || ''),
+      bcc_emails: this.extractEmails(headers.find(h => h.name?.toLowerCase() === 'bcc')?.value || ''),
+      received_at: date ? new Date(date).toISOString() : null,
+      content: textContent,
       html_content: htmlContent,
-      labels: JSON.stringify(message.labelIds || []),
+      labels: message.labelIds || [],
       is_sent: (message.labelIds || []).includes('SENT'),
       is_draft: (message.labelIds || []).includes('DRAFT'),
       is_trash: (message.labelIds || []).includes('TRASH'),
@@ -385,5 +361,38 @@ export class GmailSyncService {
     } catch (error) {
       console.error('Error updating sync metadata:', error)
     }
+  }
+
+  private async syncEmailsForTimeRange(gmail: gmail_v1.Gmail, startTime: Date, endTime: Date | null) {
+    let totalEmailsProcessed = 0
+    let pageToken: string | undefined
+    
+    const timeQuery = endTime 
+      ? `after:${Math.floor(startTime.getTime() / 1000)} before:${Math.floor(endTime.getTime() / 1000)}`
+      : `after:${Math.floor(startTime.getTime() / 1000)}`
+    
+    do {
+      await GoogleAuthHelper.checkRateLimit(this.userId, 250)
+      
+      const response = await gmail.users.messages.list({
+        userId: 'me',
+        maxResults: 100,
+        pageToken,
+        q: timeQuery
+      })
+      
+      const messages = response.data.messages || []
+      if (messages.length === 0) break
+      
+      // Process messages in batches
+      const processed = await this.processBatch(gmail, messages)
+      totalEmailsProcessed += processed
+      
+      pageToken = response.data.nextPageToken || undefined
+      console.log(`Processed ${totalEmailsProcessed} emails for time range`)
+      
+    } while (pageToken && totalEmailsProcessed < 10000) // Reasonable limit
+    
+    return totalEmailsProcessed
   }
 }
