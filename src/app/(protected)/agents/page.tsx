@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { supabaseClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 
@@ -212,7 +212,7 @@ export default function AgentsPage() {
   });
   
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = supabaseClient;
   
   // Load agents
   const loadAgents = async () => {
