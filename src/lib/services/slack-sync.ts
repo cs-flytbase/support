@@ -1,14 +1,13 @@
 import { WebClient } from '@slack/web-api'
 
 export class SlackSyncService {
-  private client: WebClient
+  private token: string | null = null
   private userId: string
   private organizationId: string
 
   constructor(userId: string, organizationId: string) {
     this.userId = userId
     this.organizationId = organizationId
-    this.client = new WebClient() // Will be initialized in init()
   }
 
   async init() {
@@ -18,7 +17,7 @@ export class SlackSyncService {
         throw new Error('Failed to initialize Slack client')
       }
       const data = await response.json()
-      this.client = new WebClient(data.token)
+      this.token = data.token
       return data
     } catch (error) {
       console.error('Error initializing Slack client:', error)
@@ -29,10 +28,25 @@ export class SlackSyncService {
   async syncChannels() {
     try {
       await this.init()
-      const result = await this.client.conversations.list({
-        types: 'public_channel,private_channel'
+      const response = await fetch('/api/slack/operations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          operation: 'listChannels',
+          params: {
+            types: 'public_channel,private_channel'
+          }
+        })
       })
-      return result.channels || []
+      
+      if (!response.ok) {
+        throw new Error('Failed to sync channels')
+      }
+      
+      const data = await response.json()
+      return data.channels || []
     } catch (error) {
       console.error('Error syncing channels:', error)
       throw error
@@ -42,11 +56,26 @@ export class SlackSyncService {
   async syncChannelMessages(channelId: string) {
     try {
       await this.init()
-      const result = await this.client.conversations.history({
-        channel: channelId,
-        limit: 100
+      const response = await fetch('/api/slack/operations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          operation: 'getChannelHistory',
+          params: {
+            channelId,
+            limit: 100
+          }
+        })
       })
-      return result.messages || []
+      
+      if (!response.ok) {
+        throw new Error('Failed to sync channel messages')
+      }
+      
+      const data = await response.json()
+      return data.messages || []
     } catch (error) {
       console.error('Error syncing channel messages:', error)
       throw error

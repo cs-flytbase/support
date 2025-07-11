@@ -16,7 +16,18 @@ export async function POST(request: Request) {
         });
         return NextResponse.json(result);
       
-      // Add other Slack operations as needed
+      case 'listChannels':
+        const channels = await client.conversations.list({
+          types: params.types || 'public_channel,private_channel'
+        });
+        return NextResponse.json(channels);
+
+      case 'getChannelHistory':
+        const messages = await client.conversations.history({
+          channel: params.channelId,
+          limit: params.limit || 100
+        });
+        return NextResponse.json(messages);
       
       default:
         return NextResponse.json(
