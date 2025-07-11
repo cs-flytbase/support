@@ -22,12 +22,16 @@ export async function POST(request: NextRequest) {
     // Parse request body
     const body = await request.json().catch(() => ({}))
     const { 
-      services = ['gmail', 'calendar'], // Default to both services
+      services = ['calendar','gmail'], // Default to both services
       syncType = 'incremental', // 'full' or 'incremental'
-      daysBack = 365 // Default to 1 year for full sync
+      daysBack = 7, // Default to 1 year for full sync
+      onlyCalendar = false // New parameter for calendar-only sync
     } = body
 
-    console.log(`Starting ${syncType} sync for user ${userId}, services: ${services.join(', ')}`)
+    // If onlyCalendar is true, only sync calendar
+    const servicesToSync = onlyCalendar ? ['calendar'] : services
+
+    console.log(`Starting ${syncType} sync for user ${userId}, services: ${servicesToSync.join(', ')}`)
 
     const results: any = {
       success: true,
@@ -36,30 +40,8 @@ export async function POST(request: NextRequest) {
       startedAt: new Date().toISOString()
     }
 
-    // Gmail sync
-    if (services.includes('gmail')) {
-      try {
-        console.log('Starting Gmail sync...')
-        const gmailSync = new GmailSyncService(userId, dbUser.id)
-        
-        if (syncType === 'full') {
-          results.gmail = await gmailSync.performFullSync(daysBack)
-        } else {
-          results.gmail = await gmailSync.performIncrementalSync()
-        }
-        
-        console.log('Gmail sync completed')
-      } catch (error: any) {
-        console.error('Gmail sync failed:', error)
-        results.gmail = { 
-          success: false, 
-          error: error.message || 'Gmail sync failed' 
-        }
-      }
-    }
-
-    // Calendar sync
-    if (services.includes('calendar')) {
+    // Calendar sync FIRST (prioritized)
+    if (servicesToSync.includes('calendar')) {
       try {
         console.log('Starting Calendar sync...')
         const calendarSync = new CalendarSyncService(userId, dbUser.id)
@@ -76,6 +58,28 @@ export async function POST(request: NextRequest) {
         results.calendar = { 
           success: false, 
           error: error.message || 'Calendar sync failed' 
+        }
+      }
+    }
+
+    // Gmail sync SECOND (after calendar)
+    if (servicesToSync.includes('gmail')) {
+      try {
+        console.log('Starting Gmail sync...')
+        const gmailSync = new GmailSyncService(userId, dbUser.id)
+        
+        if (syncType === 'full') {
+          results.gmail = await gmailSync.performFullSync(daysBack)
+        } else {
+          results.gmail = await gmailSync.performIncrementalSync()
+        }
+        
+        console.log('Gmail sync completed')
+      } catch (error: any) {
+        console.error('Gmail sync failed:', error)
+        results.gmail = { 
+          success: false, 
+          error: error.message || 'Gmail sync failed' 
         }
       }
     }
