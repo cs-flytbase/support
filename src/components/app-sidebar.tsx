@@ -12,6 +12,7 @@ import {
   Send,
   Settings2,
   SquareTerminal,
+  Plane,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -87,6 +88,33 @@ const data = {
         {
           title: "Engagements",
           url: "/hubspot?tab=engagements",
+        }
+      ],
+    },
+    {
+      title: "Flight Analytics",
+      url: "/dashboard/flight-analytics",
+      icon: Plane,
+      items: [
+        {
+          title: "Overview",
+          url: "/dashboard/flight-analytics",
+        },
+        {
+          title: "Pilot Analytics",
+          url: "/dashboard/flight-analytics?tab=pilots",
+        },
+        {
+          title: "Drone Analytics",
+          url: "/dashboard/flight-analytics?tab=drones",
+        },
+        {
+          title: "Flight Logs",
+          url: "/dashboard/flight-analytics?tab=flights",
+        },
+        {
+          title: "Compliance",
+          url: "/dashboard/flight-analytics?tab=compliance",
         }
       ],
     },
